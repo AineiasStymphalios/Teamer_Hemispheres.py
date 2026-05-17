@@ -34,7 +34,7 @@ def isAdvancedMap():
 	return 0
 
 def getNumCustomMapOptions():
-	return 8
+	return 9
 	
 def getCustomMapOptionName(argsList):
 	[iOption] = argsList
@@ -54,6 +54,8 @@ def getCustomMapOptionName(argsList):
 		return "Teamer Balancing"
 	elif iOption == 7:
 		return "Debug Signs"
+	elif iOption == 8:
+		return "Starting Plot Min. Food"
 	return ""
 	
 def getNumCustomMapOptionValues(argsList):
@@ -66,6 +68,7 @@ def getNumCustomMapOptionValues(argsList):
 	elif iOption == 5: return 2
 	elif iOption == 6: return 2
 	elif iOption == 7: return 2
+	elif iOption == 8: return 4
 	return 0
 	
 def getCustomMapOptionDescAt(argsList):
@@ -100,6 +103,11 @@ def getCustomMapOptionDescAt(argsList):
 	elif iOption == 7:
 		if iSelection == 0: return "Disabled"
 		return "Enabled"
+	elif iOption == 8:
+		if iSelection == 0: return "Disabled"
+		elif iSelection == 1: return "At least 1"
+		elif iSelection == 2: return "At least 2"
+		return "At least 3"
 	return ""
 
 def getCustomMapOptionDefault(argsList):
@@ -112,6 +120,7 @@ def getCustomMapOptionDefault(argsList):
 	elif iOption == 5: return 0
 	elif iOption == 6: return 1
 	elif iOption == 7: return 1
+	elif iOption == 8: return 1
 	return 0
 
 def getWrapX():
@@ -972,6 +981,124 @@ class ResourceManager:
 		pPlot.setBonusType(iBonus)
 		return False
 
+	def _is_bonus_appropriate_for_plot(self, iBonus, pPlot):
+		bonusInfo = self.gc.getBonusInfo(iBonus)
+
+		if pPlot.isHills():
+			if not bonusInfo.isHills(): return False
+		else:
+			if not bonusInfo.isFlatlands(): return False
+
+		if not bonusInfo.isTerrain(pPlot.getTerrainType()):
+			return False
+
+		iFeature = pPlot.getFeatureType()
+		if iFeature != -1:
+			if not bonusInfo.isFeature(iFeature):
+				iFloodplains = self.gc.getInfoTypeForString("FEATURE_FLOOD_PLAINS")
+				if iFeature == iFloodplains: return False
+				if not bonusInfo.isTerrain(pPlot.getTerrainType()):
+					return False
+
+		return True
+
+	def place_food_bonus_in_BFC(self, bonusNames, iTargetCount, bCheckExisting):
+		if iTargetCount <= 0:
+			return
+
+		bonusIDs = self._bonus_ids_from_names(bonusNames)
+		iPlains = self.gc.getInfoTypeForString("TERRAIN_PLAINS")
+		iFloodplains = self.gc.getInfoTypeForString("FEATURE_FLOOD_PLAINS")
+
+		bfcOffsets = []
+		for dx in range(-2, 3):
+			for dy in range(-2, 3):
+				if dx == 0 and dy == 0: continue
+				if abs(dx) == 2 and abs(dy) == 2: continue
+				bfcOffsets.append((dx, dy))
+
+		for iPlayer in range(self.gc.getMAX_CIV_PLAYERS()):
+			pPlayer = self.gc.getPlayer(iPlayer)
+			if not pPlayer.isEverAlive(): continue
+			pStart = pPlayer.getStartingPlot()
+			if pStart is None: continue
+			if pStart.isNone(): continue
+
+			iExisting = 0
+			if bCheckExisting:
+				for dx, dy in bfcOffsets:
+					x = pStart.getX() + dx
+					y = pStart.getY() + dy
+					if x < 0 or x >= self.iW: continue
+					if y < 0 or y >= self.iH: continue
+					pPlot = self.map.plot(x, y)
+					if pPlot.isStartingPlot(): continue
+					if pPlot.getBonusType(-1) in bonusIDs:
+						iExisting += 1
+
+			iNeeded = iTargetCount - iExisting
+			for i in range(iNeeded):
+				shuffledBonusIDs = self._shuffle_list(bonusIDs, "Start Food Bonus Shuffle")
+				bPlaced = False
+
+				for iBonus in shuffledBonusIDs:
+					validPlots = []
+					for dx, dy in bfcOffsets:
+						x = pStart.getX() + dx
+						y = pStart.getY() + dy
+						if x < 0 or x >= self.iW: continue
+						if y < 0 or y >= self.iH: continue
+						pPlot = self.map.plot(x, y)
+						if pPlot.isStartingPlot(): continue
+						if pPlot.getBonusType(-1) != -1: continue
+						if pPlot.isWater() or pPlot.isPeak(): continue
+						if self._is_bonus_appropriate_for_plot(iBonus, pPlot):
+							validPlots.append(pPlot)
+
+					if len(validPlots) > 0:
+						pTarget = validPlots[self.dice.get(len(validPlots), "Start Food Plot")]
+						iFeature = pTarget.getFeatureType()
+						if iFeature != -1 and iFeature != iFloodplains:
+							if not pTarget.canHaveBonus(iBonus, True):
+								pTarget.setFeatureType(FeatureTypes.NO_FEATURE, -1)
+						pTarget.setBonusType(iBonus)
+						self._debug_sign(pTarget, "THem start food P%d %s" % (iPlayer, self._bonus_name_from_id(iBonus)))
+						bPlaced = True
+						break
+
+				if not bPlaced:
+					emergencyPlots = []
+					for dx, dy in bfcOffsets:
+						x = pStart.getX() + dx
+						y = pStart.getY() + dy
+						if x < 0 or x >= self.iW: continue
+						if y < 0 or y >= self.iH: continue
+						pPlot = self.map.plot(x, y)
+						if pPlot.isStartingPlot(): continue
+						if pPlot.getBonusType(-1) != -1: continue
+						if pPlot.isWater() or pPlot.isPeak(): continue
+						if pPlot.calculateNatureYield(YieldTypes.YIELD_FOOD, TeamTypes.NO_TEAM, False) == 0:
+							emergencyPlots.append(pPlot)
+						elif pPlot.getFeatureType() == iFloodplains:
+							emergencyPlots.append(pPlot)
+
+					if len(emergencyPlots) > 0:
+						pTarget = emergencyPlots[self.dice.get(len(emergencyPlots), "Start Food Emergency Plot")]
+						pTarget.setPlotType(PlotTypes.PLOT_LAND, True, True)
+						pTarget.setTerrainType(iPlains, True, True)
+						pTarget.setFeatureType(FeatureTypes.NO_FEATURE, -1)
+
+						for iBonus in shuffledBonusIDs:
+							if self._is_bonus_appropriate_for_plot(iBonus, pTarget):
+								pTarget.setBonusType(iBonus)
+								self._debug_sign(pTarget, "THem emergency start food P%d %s" % (iPlayer, self._bonus_name_from_id(iBonus)))
+								bPlaced = True
+								break
+
+						if not bPlaced:
+							pTarget.setBonusType(shuffledBonusIDs[0])
+							self._debug_sign(pTarget, "THem fallback start food P%d %s" % (iPlayer, self._bonus_name_from_id(shuffledBonusIDs[0])))
+
 	def _place_bonus_copies(self, region_plots, iBonus, iCopies, regionName, bonusName, iPlayerCount):
 		if iCopies < 1: iCopies = 1
 
@@ -1000,7 +1127,7 @@ class ResourceManager:
 
 		return placed
 
-	def balance_bonus_types_in_region(self, region, bonusNames, iTargetCount):
+	def balance_bonus_types_in_continent(self, region, bonusNames, iTargetCount):
 		regionName = str(region)
 		bonusIDs = self._bonus_ids_from_names(bonusNames)
 		iPlayerCount = self._get_player_count_for_region(region)
@@ -1134,6 +1261,7 @@ def normalizeAddExtras():
 
 	iResourceOption = map.getCustomMapOption(5)
 	iTeamerBalancingOption = map.getCustomMapOption(6)
+	iStartFoodOption = map.getCustomMapOption(8)
 
 	if iResourceOption == 1:
 		balancer.normalizeAddExtras()
@@ -1153,9 +1281,14 @@ def normalizeAddExtras():
 			teamRegions.append(teamRegionMap[iTeam])
 
 		for teamRegion in teamRegions:
-			rm.balance_bonus_types_in_region(teamRegion, CalendarBonus, 4)
-			rm.balance_bonus_types_in_region(teamRegion, SemiStrategics, 3)
-			rm.balance_bonus_types_in_region(teamRegion, PreciousMetals, 2)
-			rm.balance_bonus_types_in_region(teamRegion, EarlyHappiness, 2)
+			rm.balance_bonus_types_in_continent(teamRegion, CalendarBonus, 4)
+			rm.balance_bonus_types_in_continent(teamRegion, SemiStrategics, 3)
+			rm.balance_bonus_types_in_continent(teamRegion, PreciousMetals, 2)
+			rm.balance_bonus_types_in_continent(teamRegion, EarlyHappiness, 2)
+
+	if iStartFoodOption > 0:
+		print "PY: Teamer adding starting plot food bonuses..."
+		FoodBonus = ["BONUS_WHEAT", "BONUS_RICE", "BONUS_CORN", "BONUS_COW", "BONUS_SHEEP", "BONUS_PIG", "BONUS_DEER"]
+		rm.place_food_bonus_in_BFC(FoodBonus, iStartFoodOption, True)
 
 	CyPythonMgr().allowDefaultImpl()
