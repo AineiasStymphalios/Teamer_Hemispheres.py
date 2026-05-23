@@ -55,7 +55,7 @@ def getCustomMapOptionName(argsList):
 	elif iOption == 7:
 		return "Debug Signs"
 	elif iOption == 8:
-		return "Starting Plot Min. Food"
+		return "StartPlot Min Land Food"
 	return ""
 	
 def getNumCustomMapOptionValues(argsList):
@@ -112,7 +112,7 @@ def getCustomMapOptionDescAt(argsList):
 
 def getCustomMapOptionDefault(argsList):
 	[iOption] = argsList
-	if iOption == 0: return 1
+	if iOption == 0: return 0
 	elif iOption == 1: return 1
 	elif iOption == 2: return 0
 	elif iOption == 3: return 1
@@ -852,6 +852,14 @@ class ResourceManager:
 
 		return self.gc.getGame().countCivPlayersEverAlive()
 
+	def _get_player_count_for_team(self, iTeam):
+		iCount = 0
+		for iPlayer in range(self.gc.getMAX_CIV_PLAYERS()):
+			pPlayer = self.gc.getPlayer(iPlayer)
+			if pPlayer.isEverAlive() and pPlayer.getTeam() == iTeam:
+				iCount += 1
+		return iCount
+
 	def _get_region_plots(self, region):
 		plots = []
 
@@ -894,6 +902,34 @@ class ResourceManager:
 
 		return plots
 
+	def _get_adjacent_water_plots(self, land_plots):
+		waterPlots = []
+		seen = {}
+		for pLand in land_plots:
+			x = pLand.getX()
+			y = pLand.getY()
+			for dx in range(-1, 2):
+				for dy in range(-1, 2):
+					if dx == 0 and dy == 0: continue
+					iX = x + dx
+					iY = y + dy
+					if iX < 0 or iX >= self.iW: continue
+					if iY < 0 or iY >= self.iH: continue
+					pPlot = self.map.plot(iX, iY)
+					if pPlot.isNone(): continue
+					if not pPlot.isWater(): continue
+					iPlot = self.map.plotNum(iX, iY)
+					if seen.has_key(iPlot): continue
+					seen[iPlot] = 1
+					waterPlots.append(pPlot)
+		return waterPlots
+
+	def _get_region_plots_for_bonus(self, region, iBonus):
+		region_plots = self._get_region_plots(region)
+		if self._bonus_is_water(iBonus):
+			return self._get_adjacent_water_plots(region_plots)
+		return region_plots
+
 	def _bonus_ids_from_names(self, bonusNames):
 		bonusIDs = []
 		for bonusName in bonusNames:
@@ -922,64 +958,48 @@ class ResourceManager:
 			validPlots.append(pPlot)
 		return validPlots
 
-	def _forced_bonus_plots(self, region_plots):
-		forcedPlots = []
+	def _bonus_matches_plot_type(self, pPlot, iBonus):
+		bonusInfo = self.gc.getBonusInfo(iBonus)
+
+		if self._bonus_is_water(iBonus):
+			return pPlot.isWater()
+
+		if pPlot.isWater() or pPlot.isPeak():
+			return False
+
+		if pPlot.isHills():
+			return bonusInfo.isHills()
+
+		return bonusInfo.isFlatlands()
+
+	def _bonus_is_water(self, iBonus):
+		bonusInfo = self.gc.getBonusInfo(iBonus)
+		iCoast = self.gc.getInfoTypeForString("TERRAIN_COAST")
+		iOcean = self.gc.getInfoTypeForString("TERRAIN_OCEAN")
+
+		if iCoast != -1:
+			if bonusInfo.isTerrain(iCoast):
+				return True
+		if iOcean != -1:
+			if bonusInfo.isTerrain(iOcean):
+				return True
+		return False
+
+	def _fallback_bonus_plots(self, region_plots, iBonus, bMatchPlotType):
+		bWaterBonus = self._bonus_is_water(iBonus)
+		fallbackPlots = []
 		for pPlot in region_plots:
 			if pPlot.getBonusType(-1) != -1: continue
 			if pPlot.isStartingPlot(): continue
-			if pPlot.isWater() or pPlot.isPeak(): continue
-			forcedPlots.append(pPlot)
-		return forcedPlots
-
-	def _bonus_terrain_candidates(self, iBonus):
-		bonusInfo = self.gc.getBonusInfo(iBonus)
-		terrains = []
-		for iTerrain in range(self.gc.getNumTerrainInfos()):
-			if bonusInfo.isTerrain(iTerrain):
-				terrains.append(iTerrain)
-
-		if len(terrains) == 0:
-			terrains.append(self.gc.getInfoTypeForString("TERRAIN_GRASS"))
-			terrains.append(self.gc.getInfoTypeForString("TERRAIN_PLAINS"))
-			terrains.append(self.gc.getInfoTypeForString("TERRAIN_DESERT"))
-			terrains.append(self.gc.getInfoTypeForString("TERRAIN_TUNDRA"))
-
-		return terrains
-
-	def _bonus_feature_candidates(self, iBonus):
-		bonusInfo = self.gc.getBonusInfo(iBonus)
-		features = [FeatureTypes.NO_FEATURE]
-		for iFeature in range(self.gc.getNumFeatureInfos()):
-			if bonusInfo.isFeature(iFeature):
-				features.append(iFeature)
-		return features
-
-	def _try_shape_bonus_plot(self, pPlot, iBonus, iPlotType, iTerrain, iFeature):
-		pPlot.setPlotType(iPlotType, True, True)
-		pPlot.setTerrainType(iTerrain, True, True)
-		pPlot.setFeatureType(iFeature, -1)
-		if pPlot.canHaveBonus(iBonus, True):
-			pPlot.setBonusType(iBonus)
-			return True
-		return False
-
-	def _force_bonus_on_plot(self, pPlot, iBonus):
-		terrains = self._bonus_terrain_candidates(iBonus)
-		features = self._bonus_feature_candidates(iBonus)
-		plotTypes = [PlotTypes.PLOT_LAND, PlotTypes.PLOT_HILLS]
-
-		for iPlotType in plotTypes:
-			for iTerrain in terrains:
-				for iFeature in features:
-					if self._try_shape_bonus_plot(pPlot, iBonus, iPlotType, iTerrain, iFeature):
-						return True
-
-		iGrass = self.gc.getInfoTypeForString("TERRAIN_GRASS")
-		pPlot.setPlotType(PlotTypes.PLOT_LAND, True, True)
-		pPlot.setTerrainType(iGrass, True, True)
-		pPlot.setFeatureType(FeatureTypes.NO_FEATURE, -1)
-		pPlot.setBonusType(iBonus)
-		return False
+			if bMatchPlotType:
+				if not self._bonus_matches_plot_type(pPlot, iBonus): continue
+			else:
+				if bWaterBonus:
+					if not pPlot.isWater(): continue
+				else:
+					if pPlot.isWater() or pPlot.isPeak(): continue
+			fallbackPlots.append(pPlot)
+		return fallbackPlots
 
 	def _is_bonus_appropriate_for_plot(self, iBonus, pPlot):
 		bonusInfo = self.gc.getBonusInfo(iBonus)
@@ -1113,21 +1133,28 @@ class ResourceManager:
 			placed += 1
 
 		if placed < iCopies:
-			print "THem forcing %s in %s, valid plots exhausted" % (bonusName, regionName)
-			forcedPlots = self._forced_bonus_plots(region_plots)
-			forcedPlots = self._shuffle_list(forcedPlots, "Forced Region Bonus Placement")
-			for pPlot in forcedPlots:
+			print "THem using relaxed placement for %s in %s, valid plots exhausted" % (bonusName, regionName)
+			relaxedPlots = self._fallback_bonus_plots(region_plots, iBonus, True)
+			relaxedPlots = self._shuffle_list(relaxedPlots, "Relaxed Region Bonus Placement")
+			for pPlot in relaxedPlots:
 				if placed >= iCopies: break
-				bNaturalShape = self._force_bonus_on_plot(pPlot, iBonus)
-				if bNaturalShape:
-					self._debug_sign(pPlot, "THem forced " + bonusName + " in " + regionName + " P" + str(iPlayerCount))
-				else:
-					self._debug_sign(pPlot, "THem fallback " + bonusName + " in " + regionName + " P" + str(iPlayerCount))
+				pPlot.setBonusType(iBonus)
+				self._debug_sign(pPlot, "THem relaxed " + bonusName + " in " + regionName + " P" + str(iPlayerCount))
+				placed += 1
+
+		if placed < iCopies:
+			print "THem using last-ditch placement for %s in %s, relaxed plots exhausted" % (bonusName, regionName)
+			fallbackPlots = self._fallback_bonus_plots(region_plots, iBonus, False)
+			fallbackPlots = self._shuffle_list(fallbackPlots, "Last Ditch Region Bonus Placement")
+			for pPlot in fallbackPlots:
+				if placed >= iCopies: break
+				pPlot.setBonusType(iBonus)
+				self._debug_sign(pPlot, "THem fallback " + bonusName + " in " + regionName + " P" + str(iPlayerCount))
 				placed += 1
 
 		return placed
 
-	def balance_bonus_types_in_continent(self, region, bonusNames, iTargetCount):
+	def balance_bonus_types_in_continent(self, region, bonusNames, iTargetCount, iCopies):
 		regionName = str(region)
 		bonusIDs = self._bonus_ids_from_names(bonusNames)
 		iPlayerCount = self._get_player_count_for_region(region)
@@ -1150,12 +1177,10 @@ class ResourceManager:
 
 			missing = self._shuffle_list(missing, "Region Bonus Missing Types")
 			iNeeded = iTargetCount - iPresent
-			iCopies = int(0.5 * iPlayerCount)
-			if iCopies < 1: iCopies = 1
 
 			for i in range(iNeeded):
 				if i >= len(missing): break
-				self._place_bonus_copies(region_plots, missing[i], iCopies, regionName, self._bonus_name_from_id(missing[i]), iPlayerCount)
+				self.add_bonus_types_to_continent(region, [self._bonus_name_from_id(missing[i])], iCopies)
 
 			present = self._present_bonus_types(region_plots, bonusIDs)
 			return len(present)
@@ -1177,6 +1202,26 @@ class ResourceManager:
 			return len(present)
 
 		return iPresent
+
+	def add_bonus_types_to_continent(self, region, bonusNames, iQuantity):
+		if iQuantity <= 0:
+			return 0
+
+		regionName = str(region)
+		bonusIDs = self._bonus_ids_from_names(bonusNames)
+		placed = 0
+		bonusQueue = self._shuffle_list(bonusIDs, "Region Add Bonus Types")
+		for i in range(iQuantity):
+			if len(bonusQueue) == 0: break
+			iBonus = bonusQueue[i % len(bonusQueue)]
+			iPlayerCount = self._get_player_count_for_region(region)
+			region_plots = self._get_region_plots_for_bonus(region, iBonus)
+			if len(region_plots) == 0:
+				print "THem add bonuses found no plots for %s in region %s" % (self._bonus_name_from_id(iBonus), regionName)
+				continue
+			placed += self._place_bonus_copies(region_plots, iBonus, 1, regionName, self._bonus_name_from_id(iBonus), iPlayerCount)
+
+		return placed
 
 	def place_resource_near_team_member(self, bonus_name):
 		iBonus = self._bonus_id(bonus_name)
@@ -1273,18 +1318,24 @@ def normalizeAddExtras():
 		SemiStrategics = ["BONUS_IVORY", "BONUS_STONE", "BONUS_MARBLE"]
 		PreciousMetals = ["BONUS_GOLD", "BONUS_SILVER", "BONUS_GEMS"]
 		EarlyHappiness = ["BONUS_FUR", "BONUS_WINE"]
+		Seafood = ["BONUS_FISH", "BONUS_CLAM", "BONUS_CRAB"]
 
 		teamRegions = []
 		sortedTeams = teamRegionMap.keys()
 		sortedTeams.sort()
 		for iTeam in sortedTeams:
-			teamRegions.append(teamRegionMap[iTeam])
+			teamRegions.append((iTeam, teamRegionMap[iTeam]))
 
-		for teamRegion in teamRegions:
-			rm.balance_bonus_types_in_continent(teamRegion, CalendarBonus, 4)
-			rm.balance_bonus_types_in_continent(teamRegion, SemiStrategics, 3)
-			rm.balance_bonus_types_in_continent(teamRegion, PreciousMetals, 2)
-			rm.balance_bonus_types_in_continent(teamRegion, EarlyHappiness, 2)
+		for iTeam, teamRegion in teamRegions:
+			iPlayerCount = rm._get_player_count_for_team(iTeam)
+			iCopies = int(0.5 * iPlayerCount) + 1
+			if iCopies < 1: iCopies = 1
+
+			rm.balance_bonus_types_in_continent(teamRegion, CalendarBonus, 4, iCopies)
+			rm.balance_bonus_types_in_continent(teamRegion, SemiStrategics, 3, iCopies)
+			rm.balance_bonus_types_in_continent(teamRegion, PreciousMetals, 2, iCopies)
+			rm.balance_bonus_types_in_continent(teamRegion, EarlyHappiness, 2, iCopies)
+			rm.add_bonus_types_to_continent(teamRegion, Seafood, iPlayerCount*2)
 
 	if iStartFoodOption > 0:
 		print "PY: Teamer adding starting plot food bonuses..."
