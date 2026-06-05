@@ -1,13 +1,8 @@
 #
-#	FILE:	 Hemispheres.py
-#	AUTHOR:  Ben Sarsgard
-#	PURPOSE: Global map script - Hemisphere or quadrant split with oceanic divide
-#		Mostly adapted from Sirian's Big_and_Small
-#	VERSION: 1.20
-#-----------------------------------------------------------------------------
-#	Copyright (c) 2007 Firaxis Games, Inc. All rights reserved.
-#-----------------------------------------------------------------------------
-#
+#	FILE:	 Teamer_Hemispheres.py
+#	AUTHOR:  Aineias Symphalios
+#	Adapted from Ben Sarsgard's Hemispheres.py
+
 
 from CvPythonExtensions import *
 import CvUtil
@@ -26,15 +21,16 @@ _THEM_REGION_RECTS = {}
 bDebugSignsEnabled = True
 
 def getDescription():
-	#TODO: get my own text string
-	return "TXT_KEY_MAP_SCRIPT_LEFT_AND_RIGHT_DESCR"
+	desc = "Hemispheres.py with customizations intended for multiplayer teamer games."
+	desc += "Recommended sizes: TBD"
+	return desc
 
 def isAdvancedMap():
 	"This map should not show up in simple mode"
 	return 0
 
 def getNumCustomMapOptions():
-	return 9
+	return 8
 	
 def getCustomMapOptionName(argsList):
 	[iOption] = argsList
@@ -49,12 +45,10 @@ def getCustomMapOptionName(argsList):
 	elif iOption == 4:
 		return "Axial Tilt"
 	elif iOption == 5:
-		return "Resources"
+		return "Teamer Resource Balancing"
 	elif iOption == 6:
-		return "Teamer Balancing"
-	elif iOption == 7:
 		return "Debug Signs"
-	elif iOption == 8:
+	elif iOption == 7:
 		return "StartPlot Min Land Food"
 	return ""
 	
@@ -67,8 +61,7 @@ def getNumCustomMapOptionValues(argsList):
 	elif iOption == 4: return 2
 	elif iOption == 5: return 2
 	elif iOption == 6: return 2
-	elif iOption == 7: return 2
-	elif iOption == 8: return 4
+	elif iOption == 7: return 4
 	return 0
 	
 def getCustomMapOptionDescAt(argsList):
@@ -96,14 +89,11 @@ def getCustomMapOptionDescAt(argsList):
 		return "90 Degrees"
 	elif iOption == 5:
 		if iSelection == 0: return "Disabled"
-		return "Balanced"
+		return "Enabled"
 	elif iOption == 6:
 		if iSelection == 0: return "Disabled"
 		return "Enabled"
 	elif iOption == 7:
-		if iSelection == 0: return "Disabled"
-		return "Enabled"
-	elif iOption == 8:
 		if iSelection == 0: return "Disabled"
 		elif iSelection == 1: return "At least 1"
 		elif iSelection == 2: return "At least 2"
@@ -117,10 +107,9 @@ def getCustomMapOptionDefault(argsList):
 	elif iOption == 2: return 0
 	elif iOption == 3: return 1
 	elif iOption == 4: return 0
-	elif iOption == 5: return 0
+	elif iOption == 5: return 1
 	elif iOption == 6: return 1
 	elif iOption == 7: return 1
-	elif iOption == 8: return 1
 	return 0
 
 def getWrapX():
@@ -159,7 +148,7 @@ def beforeGeneration():
 	teamRegionMap.clear()
 	teamAreaMap.clear()
 	bTeamPlacement = False
-	bDebugSignsEnabled = (map.getCustomMapOption(7) == 1)
+	bDebugSignsEnabled = (map.getCustomMapOption(6) == 1)
 
 	activeTeams = []
 	for iPlayer in range(gc.getMAX_CIV_PLAYERS()):
@@ -172,7 +161,7 @@ def beforeGeneration():
 	activeTeams.sort()
 	iNumTeams = len(activeTeams)
 	iRegionCount = 2 + map.getCustomMapOption(2)
-	vSplitPrimary, vSplitSecondary, vSplitTertiary, tripleSplit = getTHemSplitSettings(iRegionCount)
+	vSplitPrimary, vSplitSecondary, vSplitTertiary, tripleSplit = THemContinentRegionBuilder.getSplitSettings(iRegionCount)
 
 	if iNumTeams == 2:
 		bTeamPlacement = True
@@ -193,12 +182,24 @@ class THemMultilayeredFractal(CvMapGeneratorUtil.MultilayeredFractal):
 		print("Patches of Tiny Islands: ", numTinies)
 		if numTinies:
 			for tiny_loop in range(numTinies):
-				tinyWidth = int(self.iW * 0.15)
-				tinyHeight = int(self.iH * 0.15)
-				tinyWestX = iWestX + self.dice.get(iWidth - tinyWidth, "Tiny Longitude - Custom Continents PYTHON")
-				tinySouthY = iSouthY + self.dice.get(iHeight - tinyHeight, "Tiny Latitude - Custom Continents PYTHON")
+				tinyWidth = int(self.iW * 0.20)
+				tinyHeight = int(self.iH * 0.20)
+				iXRange = iWidth - tinyWidth
+				iYRange = iHeight - tinyHeight
+				if iXRange < 0:
+					iXRange = 0
+					tinyWidth = iWidth
+				if iYRange < 0:
+					iYRange = 0
+					tinyHeight = iHeight
+				tinyWestX = iWestX
+				tinySouthY = iSouthY
+				if iXRange > 0:
+					tinyWestX += self.dice.get(iXRange, "Tiny Longitude - Custom Continents PYTHON")
+				if iYRange > 0:
+					tinySouthY += self.dice.get(iYRange, "Tiny Latitude - Custom Continents PYTHON")
 
-				self.generatePlotsInRegion(80,
+				self.generatePlotsInRegion(85,
 										   tinyWidth, tinyHeight,
 										   tinyWestX, tinySouthY,
 										   iGrain, 3,
@@ -238,287 +239,302 @@ class THemMultilayeredFractal(CvMapGeneratorUtil.MultilayeredFractal):
 		print "Done"
 		return self.wholeworldPlotTypes
 
-def getTHemContinentSettings(map, gc):
-	iSeaLevelChange = gc.getSeaLevelInfo(map.getSeaLevel()).getSeaLevelChange()
-	print("getSeaLevelChange", iSeaLevelChange)
+class THemContinentRegionBuilder:
+	def __init__(self, map, gc):
+		self.map = map
+		self.gc = gc
+		self.iW = map.getGridWidth()
+		self.iH = map.getGridHeight()
+		self.regionRects = {}
 
-	iContinentOption = map.getCustomMapOption(0)
-	if iContinentOption == 3:
-		settings = {
-			"primary": (1, 80 + iSeaLevelChange),
-			"secondary": (3, 70 + iSeaLevelChange),
-			"tertiary": (2, 75 + iSeaLevelChange)
-			}
-	elif iContinentOption == 0:
-		iGrain = 1
-		settings = {
-			"primary": (iGrain, 70 + iSeaLevelChange),
-			"secondary": (iGrain, 70 + iSeaLevelChange),
-			"tertiary": (iGrain, 70 + iSeaLevelChange)
-			}
-	else:
-		iGrain = 2 + iContinentOption
-		settings = {
-			"primary": (iGrain, 70 + iSeaLevelChange),
-			"secondary": (iGrain, 70 + iSeaLevelChange),
-			"tertiary": (iGrain, 70 + iSeaLevelChange)
-			}
-	return settings
-
-def shrinkTHemRegion(iW, iH, iWestX, iSouthY, iWidth, iHeight):
-	iMarginX = int(0.05 * iW)
-	iMarginY = int(0.0 * iH)
-
-	if iMarginX < 1: iMarginX = 1
-	if iMarginY < 1: iMarginY = 1
-
-	if iWidth <= (2 * iMarginX) + 4:
-		iMarginX = 0
-	if iHeight <= (2 * iMarginY) + 4:
-		iMarginY = 0
-
-	return (iWestX + iMarginX, iSouthY + iMarginY, iWidth - (2 * iMarginX), iHeight - (2 * iMarginY))
-
-def getTHemCoreRegion(iWestX, iSouthY, iWidth, iHeight):
-	iCoreWidth = int(0.50 * iWidth)
-	iCoreHeight = int(0.60 * iHeight)
-
-	if iCoreWidth < 4: iCoreWidth = iWidth
-	if iCoreHeight < 4: iCoreHeight = iHeight
-
-	iCoreWestX = iWestX + ((iWidth - iCoreWidth) / 2)
-	iCoreSouthY = iSouthY + ((iHeight - iCoreHeight) / 2)
-	return (iCoreWestX, iCoreSouthY, iCoreWidth, iCoreHeight)
-
-def getTHemSplitSettings(iRegionCount):
-	if iRegionCount == 2:
+	def getSplitSettings(iRegionCount):
+		if iRegionCount == 2:
+			return (0, 0, 0, 0)
+		elif iRegionCount == 3:
+			return (0, 0, 0, 1)
+		elif iRegionCount == 4:
+			return (1, 1, 0, 0)
+		elif iRegionCount == 5:
+			return (0, 1, 1, 1)
+		elif iRegionCount == 6:
+			return (1, 1, 1, 1)
 		return (0, 0, 0, 0)
-	elif iRegionCount == 3:
-		return (0, 0, 0, 1)
-	elif iRegionCount == 4:
-		return (1, 1, 0, 0)
-	elif iRegionCount == 5:
-		return (0, 1, 1, 1)
-	elif iRegionCount == 6:
-		return (1, 1, 1, 1)
-	return (0, 0, 0, 0)
+	getSplitSettings = staticmethod(getSplitSettings)
 
-def getTHemHorizontalBand(iW, label, tripleSplit):
-	global xShiftRoll
+	def getContinentSettings(self):
+		iSeaLevelChange = self.gc.getSeaLevelInfo(self.map.getSeaLevel()).getSeaLevelChange()
+		print("getSeaLevelChange", iSeaLevelChange)
 
-	if label == "tertiary":
-		westShift = int(0.66 * iW)
-		eastShift = 0
-	elif label == "primary":
-		if tripleSplit:
-			if xShiftRoll:
-				westShift = int(0.33 * iW)
-				eastShift = int(0.33 * iW)
-			else:
-				westShift = 0
-				eastShift = int(0.66 * iW)
+		iContinentOption = self.map.getCustomMapOption(0)
+		if iContinentOption == 3:
+			return {
+				"primary": (1, 80 + iSeaLevelChange),
+				"secondary": (3, 70 + iSeaLevelChange),
+				"tertiary": (2, 75 + iSeaLevelChange)
+				}
+		elif iContinentOption == 0:
+			iGrain = 1
 		else:
-			if xShiftRoll:
-				westShift = int(0.5 * iW)
-				eastShift = 0
+			iGrain = 2 + iContinentOption
+
+		return {
+			"primary": (iGrain, 70 + iSeaLevelChange),
+			"secondary": (iGrain, 70 + iSeaLevelChange),
+			"tertiary": (iGrain, 70 + iSeaLevelChange)
+			}
+
+	def shrinkRegion(self, iWestX, iSouthY, iWidth, iHeight):
+		iMarginX = int(0.05 * self.iW)
+		iMarginY = int(0.0 * self.iH)
+
+		if iMarginX < 1: iMarginX = 1
+		if iMarginY < 1: iMarginY = 1
+
+		if iWidth <= (2 * iMarginX) + 4:
+			iMarginX = 0
+		if iHeight <= (2 * iMarginY) + 4:
+			iMarginY = 0
+
+		return (iWestX + iMarginX, iSouthY + iMarginY, iWidth - (2 * iMarginX), iHeight - (2 * iMarginY))
+
+	def getCoreRegion(self, iWestX, iSouthY, iWidth, iHeight):
+		iCoreWidth = int(0.50 * iWidth)
+		iCoreHeight = int(0.60 * iHeight)
+
+		if iCoreWidth < 4: iCoreWidth = iWidth
+		if iCoreHeight < 4: iCoreHeight = iHeight
+
+		iCoreWestX = iWestX + ((iWidth - iCoreWidth) / 2)
+		iCoreSouthY = iSouthY + ((iHeight - iCoreHeight) / 2)
+		return (iCoreWestX, iCoreSouthY, iCoreWidth, iCoreHeight)
+
+	def getHorizontalBand(self, label, tripleSplit):
+		global xShiftRoll
+
+		if label == "tertiary":
+			westShift = int(0.66 * self.iW)
+			eastShift = 0
+		elif label == "primary":
+			if tripleSplit:
+				if xShiftRoll:
+					westShift = int(0.33 * self.iW)
+					eastShift = int(0.33 * self.iW)
+				else:
+					westShift = 0
+					eastShift = int(0.66 * self.iW)
 			else:
-				westShift = 0
-				eastShift = int(0.5 * iW)
-	else:
-		if tripleSplit:
-			if xShiftRoll:
-				westShift = 0
-				eastShift = int(0.66 * iW)
+				if xShiftRoll:
+					westShift = int(0.5 * self.iW)
+					eastShift = 0
+				else:
+					westShift = 0
+					eastShift = int(0.5 * self.iW)
+		else:
+			if tripleSplit:
+				if xShiftRoll:
+					westShift = 0
+					eastShift = int(0.66 * self.iW)
+				else:
+					westShift = int(0.33 * self.iW)
+					eastShift = int(0.33 * self.iW)
 			else:
-				westShift = int(0.33 * iW)
-				eastShift = int(0.33 * iW)
-		else:
-			if xShiftRoll:
-				westShift = 0
-				eastShift = int(0.5 * iW)
+				if xShiftRoll:
+					westShift = 0
+					eastShift = int(0.5 * self.iW)
+				else:
+					westShift = int(0.5 * self.iW)
+					eastShift = 0
+
+		iWestX = westShift
+		iEastX = self.iW - eastShift
+		return (iWestX, iEastX - iWestX)
+
+	def getVerticalBands(self, vSplit):
+		global yShiftRoll
+		global yPortionRoll
+
+		if not vSplit:
+			return [(0, self.iH)]
+
+		splitYBigger = 0.5
+		splitYSmaller = 0.5
+		splitYBuffer = 0.1
+
+		if yPortionRoll:
+			if yShiftRoll:
+				firstNorth = int(splitYBuffer * self.iH)
+				firstSouth = int(splitYBigger * self.iH)
+				secondNorth = int(splitYSmaller * self.iH)
+				secondSouth = int(splitYBuffer * self.iH)
 			else:
-				westShift = int(0.5 * iW)
-				eastShift = 0
-
-	iWestX = westShift
-	iEastX = iW - eastShift
-	return (iWestX, iEastX - iWestX)
-
-def getTHemVerticalBands(iH, vSplit):
-	global yShiftRoll
-	global yPortionRoll
-
-	if not vSplit:
-		return [(0, iH)]
-
-	splitYBigger = 0.5
-	splitYSmaller = 0.5
-	splitYBuffer = 0.1
-
-	if yPortionRoll:
-		if yShiftRoll:
-			firstNorth = int(splitYBuffer * iH)
-			firstSouth = int(splitYBigger * iH)
-			secondNorth = int(splitYSmaller * iH)
-			secondSouth = int(splitYBuffer * iH)
+				firstNorth = int(splitYSmaller * self.iH)
+				firstSouth = int(splitYBuffer * self.iH)
+				secondNorth = int(splitYBuffer * self.iH)
+				secondSouth = int(splitYBigger * self.iH)
 		else:
-			firstNorth = int(splitYSmaller * iH)
-			firstSouth = int(splitYBuffer * iH)
-			secondNorth = int(splitYBuffer * iH)
-			secondSouth = int(splitYBigger * iH)
-	else:
-		if yShiftRoll:
-			firstNorth = int(splitYBuffer * iH)
-			firstSouth = int(splitYSmaller * iH)
-			secondNorth = int(splitYBigger * iH)
-			secondSouth = int(splitYBuffer * iH)
+			if yShiftRoll:
+				firstNorth = int(splitYBuffer * self.iH)
+				firstSouth = int(splitYSmaller * self.iH)
+				secondNorth = int(splitYBigger * self.iH)
+				secondSouth = int(splitYBuffer * self.iH)
+			else:
+				firstNorth = int(splitYBigger * self.iH)
+				firstSouth = int(splitYBuffer * self.iH)
+				secondNorth = int(splitYBuffer * self.iH)
+				secondSouth = int(splitYSmaller * self.iH)
+
+		return [
+			(firstSouth, self.iH - firstNorth - firstSouth),
+			(secondSouth, self.iH - secondNorth - secondSouth)
+			]
+
+	def getIslandStripRegions(self, iWestX, iSouthY, iWidth, iHeight):
+		iCutHeight = int(0.20 * self.iH)
+		if iCutHeight < 1:
+			iCutHeight = 1
+		if iCutHeight > iHeight:
+			iCutHeight = iHeight
+
+		return (
+			(iWestX, iSouthY, iWidth, iCutHeight),
+			(iWestX, iSouthY + iHeight - iCutHeight, iWidth, iCutHeight)
+			)
+
+	def getIslandCounts(self, label, vSplit):
+		if vSplit:
+			minTinies = 1
+			extraTinies = 2
+			if label != "primary":
+				minTinies = 2
+				extraTinies = 3
 		else:
-			firstNorth = int(splitYBigger * iH)
-			firstSouth = int(splitYBuffer * iH)
-			secondNorth = int(splitYBuffer * iH)
-			secondSouth = int(splitYSmaller * iH)
-
-	return [
-		(firstSouth, iH - firstNorth - firstSouth),
-		(secondSouth, iH - secondNorth - secondSouth)
-		]
-
-def addTHemContinentRegions(region_data, label, iW, iH, vSplit, tripleSplit, settings, iIslandsGrain, tinyIslandOverlap):
-	global _THEM_REGION_RECTS
-
-	map = CyMap()
-	iWestX, iWidth = getTHemHorizontalBand(iW, label, tripleSplit)
-	iGrain, iWater = settings[label]
-	xExp = 6
-	bands = getTHemVerticalBands(iH, vSplit)
-
-	if vSplit:
-		minTinies = 1
-		extraTinies = 2
-		if label != "primary":
 			minTinies = 2
 			extraTinies = 3
-	else:
-		minTinies = 2
-		extraTinies = 3
-		if label != "primary":
-			minTinies = 3
-			extraTinies = 4
+			if label != "primary":
+				minTinies = 3
+				extraTinies = 4
+		return (minTinies, extraTinies)
 
-	for i in range(len(bands)):
-		iSouthY, iHeight = bands[i]
-		iContWestX, iContSouthY, iContWidth, iContHeight = shrinkTHemRegion(iW, iH, iWestX, iSouthY, iWidth, iHeight)
-		region_data.append(("continent", label + " shoreline", iWater, iContWestX, iContSouthY, iContWidth, iContHeight, iGrain, xExp))
-		iCoreWestX, iCoreSouthY, iCoreWidth, iCoreHeight = getTHemCoreRegion(iContWestX, iContSouthY, iContWidth, iContHeight)
-		region_data.append(("continent", label + " core", 30, iCoreWestX, iCoreSouthY, iCoreWidth, iCoreHeight, 1, xExp))
-		if not _THEM_REGION_RECTS.has_key(label):
-			_THEM_REGION_RECTS[label] = []
-		_THEM_REGION_RECTS[label].append((iContWestX, iContSouthY, iContWidth, iContHeight))
-		if tinyIslandOverlap == 0:
-			region_data.append(("islands", label + " islands", minTinies, extraTinies, iContWestX, iContSouthY, iContWidth, iContHeight, iIslandsGrain))
+	def appendRegionRect(self, label, rect):
+		if not self.regionRects.has_key(label):
+			self.regionRects[label] = []
+		self.regionRects[label].append(rect)
 
-def buildTHemRegionData(map, gc):
-	global _THEM_REGION_RECTS
+	def addContinentRegions(self, region_data, label, vSplit, tripleSplit, settings, iIslandsGrain, tinyIslandOverlap):
+		iWestX, iWidth = self.getHorizontalBand(label, tripleSplit)
+		iGrain, iWater = settings[label]
+		xExp = 6
+		bands = self.getVerticalBands(vSplit)
+		minTinies, extraTinies = self.getIslandCounts(label, vSplit)
 
-	_THEM_REGION_RECTS = {}
-	iW = map.getGridWidth()
-	iH = map.getGridHeight()
-	settings = getTHemContinentSettings(map, gc)
-	iIslandsGrain = 3 + map.getCustomMapOption(1)
-	tinyIslandOverlap = 0
-	iRegionCount = 2 + map.getCustomMapOption(2)
-	vSplitPrimary, vSplitSecondary, vSplitTertiary, tripleSplit = getTHemSplitSettings(iRegionCount)
-	region_data = []
+		for i in range(len(bands)):
+			iSouthY, iHeight = bands[i]
+			iContWestX, iContSouthY, iContWidth, iContHeight = self.shrinkRegion(iWestX, iSouthY, iWidth, iHeight)
+			region_data.append(("continent", label + " shoreline", iWater, iContWestX, iContSouthY, iContWidth, iContHeight, iGrain, xExp))
+			iCoreWestX, iCoreSouthY, iCoreWidth, iCoreHeight = self.getCoreRegion(iContWestX, iContSouthY, iContWidth, iContHeight)
+			region_data.append(("continent", label + " core", 30, iCoreWestX, iCoreSouthY, iCoreWidth, iCoreHeight, 1, xExp))
+			self.appendRegionRect(label, (iContWestX, iContSouthY, iContWidth, iContHeight))
+			if tinyIslandOverlap == 0:
+				islandRects = self.getIslandStripRegions(iContWestX, iContSouthY, iContWidth, iContHeight)
+				iIslandWestX, iIslandSouthY, iIslandWidth, iIslandHeight = islandRects[0]
+				region_data.append(("islands", label + " south islands", minTinies, extraTinies, iIslandWestX, iIslandSouthY, iIslandWidth, iIslandHeight, iIslandsGrain))
+				iIslandWestX, iIslandSouthY, iIslandWidth, iIslandHeight = islandRects[1]
+				region_data.append(("islands", label + " north islands", minTinies, extraTinies, iIslandWestX, iIslandSouthY, iIslandWidth, iIslandHeight, iIslandsGrain))
 
-	if tinyIslandOverlap:
-		region_data.append(("islands", "overlap islands", 4, 6, 0, 0, iW, iH, iIslandsGrain))
+	def buildRegionData(self):
+		self.regionRects = {}
+		settings = self.getContinentSettings()
+		iIslandsGrain = 4 + self.map.getCustomMapOption(1)
+		tinyIslandOverlap = 0
+		iRegionCount = 2 + self.map.getCustomMapOption(2)
+		vSplitPrimary, vSplitSecondary, vSplitTertiary, tripleSplit = THemContinentRegionBuilder.getSplitSettings(iRegionCount)
+		region_data = []
 
-	addTHemContinentRegions(region_data, "primary", iW, iH, vSplitPrimary, tripleSplit, settings, iIslandsGrain, tinyIslandOverlap)
-	addTHemContinentRegions(region_data, "secondary", iW, iH, vSplitSecondary, tripleSplit, settings, iIslandsGrain, tinyIslandOverlap)
-	if tripleSplit:
-		addTHemContinentRegions(region_data, "tertiary", iW, iH, vSplitTertiary, tripleSplit, settings, iIslandsGrain, tinyIslandOverlap)
+		if tinyIslandOverlap:
+			region_data.append(("islands", "overlap islands", 4, 6, 0, 0, self.iW, self.iH, iIslandsGrain))
 
-	return region_data
+		self.addContinentRegions(region_data, "primary", vSplitPrimary, tripleSplit, settings, iIslandsGrain, tinyIslandOverlap)
+		self.addContinentRegions(region_data, "secondary", vSplitSecondary, tripleSplit, settings, iIslandsGrain, tinyIslandOverlap)
+		if tripleSplit:
+			self.addContinentRegions(region_data, "tertiary", vSplitTertiary, tripleSplit, settings, iIslandsGrain, tinyIslandOverlap)
 
-def copyTHemRegionRects():
-	global _THEM_REGION_RECTS
+		return region_data
 
-	rectsCopy = {}
-	for label in _THEM_REGION_RECTS.keys():
-		rectsCopy[label] = []
-		for rect in _THEM_REGION_RECTS[label]:
-			rectsCopy[label].append(rect)
-	return rectsCopy
+	def copyRegionRects(self):
+		rectsCopy = {}
+		for label in self.regionRects.keys():
+			rectsCopy[label] = []
+			for rect in self.regionRects[label]:
+				rectsCopy[label].append(rect)
+		return rectsCopy
 
-def countTHemRegionLand(plotTypes, iW):
-	global _THEM_REGION_RECTS
+	def countRegionLand(self, plotTypes):
+		counts = {}
+		for label in self.regionRects.keys():
+			iCount = 0
+			for rect in self.regionRects[label]:
+				iWestX, iSouthY, iWidth, iHeight = rect
+				for x in range(iWestX, iWestX + iWidth):
+					for y in range(iSouthY, iSouthY + iHeight):
+						i = y * self.iW + x
+						if plotTypes[i] != PlotTypes.PLOT_OCEAN:
+							iCount += 1
+			counts[label] = iCount
+		return counts
 
-	counts = {}
-	for label in _THEM_REGION_RECTS.keys():
-		iCount = 0
-		for rect in _THEM_REGION_RECTS[label]:
-			iWestX, iSouthY, iWidth, iHeight = rect
-			for x in range(iWestX, iWestX + iWidth):
-				for y in range(iSouthY, iSouthY + iHeight):
-					i = y * iW + x
-					if plotTypes[i] != PlotTypes.PLOT_OCEAN:
-						iCount += 1
-		counts[label] = iCount
-	return counts
+	def getLandBalanceScore(self, counts):
+		labels = counts.keys()
+		if len(labels) < 2:
+			return 0
 
-def getTHemLandBalanceScore(counts):
-	labels = counts.keys()
-	if len(labels) < 2:
-		return 0
+		iTotal = 0
+		for label in labels:
+			iTotal += counts[label]
 
-	iTotal = 0
-	for label in labels:
-		iTotal += counts[label]
+		if iTotal == 0:
+			return 0
 
-	if iTotal == 0:
-		return 0
+		iRegions = len(labels)
+		iWorst = 0
+		for label in labels:
+			iScore = abs(((counts[label] * iRegions * 10000) / iTotal) - 10000)
+			if iScore > iWorst:
+				iWorst = iScore
 
-	iRegions = len(labels)
-	iWorst = 0
-	for label in labels:
-		iScore = abs(((counts[label] * iRegions * 10000) / iTotal) - 10000)
-		if iScore > iWorst:
-			iWorst = iScore
+		return iWorst
 
-	return iWorst
+	def isLandBalanceAcceptable(self, counts):
+		labels = counts.keys()
+		if len(labels) < 2:
+			return True
 
-def isTHemLandBalanceAcceptable(counts):
-	labels = counts.keys()
-	if len(labels) < 2:
+		iTotal = 0
+		for label in labels:
+			iTotal += counts[label]
+
+		if iTotal == 0:
+			return True
+
+		iRegions = len(labels)
+		for label in labels:
+			iScaled = counts[label] * iRegions * 100
+			# +/- 3%
+			if iScaled < iTotal * 97:
+				return False
+			if iScaled > iTotal * 103:
+				return False
+
 		return True
 
-	iTotal = 0
-	for label in labels:
-		iTotal += counts[label]
-
-	if iTotal == 0:
-		return True
-
-	iRegions = len(labels)
-	for label in labels:
-		iScaled = counts[label] * iRegions * 100
-		# +/- 3%
-		if iScaled < iTotal * 97:
-			return False
-		if iScaled > iTotal * 103:
-			return False
-
-	return True
-
-def printTHemLandBalance(iAttempt, counts, bAccepted):
-	labels = counts.keys()
-	labels.sort()
-	sStatus = "rejected"
-	if bAccepted:
-		sStatus = "accepted"
-	print "THem land balance attempt %d %s" % (iAttempt, sStatus)
-	for label in labels:
-		print "  %s land: %d" % (label, counts[label])
+	def printLandBalance(self, iAttempt, counts, bAccepted):
+		labels = counts.keys()
+		labels.sort()
+		sStatus = "rejected"
+		if bAccepted:
+			sStatus = "accepted"
+		print "THem land balance attempt %d %s" % (iAttempt, sStatus)
+		for label in labels:
+			print "  %s land: %d" % (label, counts[label])
 
 def generatePlotTypes():
 	global _THEM_REGION_RECTS
@@ -527,27 +543,28 @@ def generatePlotTypes():
 	NiTextOut("Setting Plot Types (Python Custom Continents) ...")
 	gc = CyGlobalContext()
 	map = CyMap()
-	iW = map.getGridWidth()
 	iMaxAttempts = 20
 	bestPlotTypes = None
 	bestRects = None
 	iBestScore = -1
 
 	for iAttempt in range(1, iMaxAttempts + 1):
-		region_data = buildTHemRegionData(map, gc)
+		builder = THemContinentRegionBuilder(map, gc)
+		region_data = builder.buildRegionData()
 		fractal_world = THemMultilayeredFractal()
 		plotTypes = fractal_world.generatePlotsByRegion(region_data)
-		counts = countTHemRegionLand(plotTypes, iW)
-		bAccepted = isTHemLandBalanceAcceptable(counts)
-		printTHemLandBalance(iAttempt, counts, bAccepted)
+		counts = builder.countRegionLand(plotTypes)
+		bAccepted = builder.isLandBalanceAcceptable(counts)
+		builder.printLandBalance(iAttempt, counts, bAccepted)
 		if bAccepted:
+			_THEM_REGION_RECTS = builder.copyRegionRects()
 			return plotTypes
 
-		iScore = getTHemLandBalanceScore(counts)
+		iScore = builder.getLandBalanceScore(counts)
 		if iBestScore == -1 or iScore < iBestScore:
 			iBestScore = iScore
 			bestPlotTypes = plotTypes
-			bestRects = copyTHemRegionRects()
+			bestRects = builder.copyRegionRects()
 
 	if bestRects != None:
 		_THEM_REGION_RECTS = bestRects
@@ -611,12 +628,44 @@ def _resolve_team_areas():
 
 	return True
 
+def _get_team_region_bounds(label, iW, iH):
+	global _THEM_REGION_RECTS
+
+	rects = _THEM_REGION_RECTS.get(label, [])
+	if len(rects) == 0:
+		return (0, iW - 1, 0, iH - 1)
+
+	xMin = iW - 1
+	xMax = 0
+	yMin = iH - 1
+	yMax = 0
+
+	for rect in rects:
+		iWestX, iSouthY, iWidth, iHeight = rect
+		iEastX = iWestX + iWidth - 1
+		iNorthY = iSouthY + iHeight - 1
+		if iWestX < xMin: xMin = iWestX
+		if iEastX > xMax: xMax = iEastX
+		if iSouthY < yMin: yMin = iSouthY
+		if iNorthY > yMax: yMax = iNorthY
+
+	if xMin < 0: xMin = 0
+	if xMax > iW - 1: xMax = iW - 1
+	if yMin < 0: yMin = 0
+	if yMax > iH - 1: yMax = iH - 1
+
+	return (xMin, xMax, yMin, yMax)
+
 def _assign_all_starting_plots():
 	global bTeamPlacement
+	global teamRegionMap
 	global teamAreaMap
 
 	gc = CyGlobalContext()
 	map = CyMap()
+	mapRand = gc.getGame().getMapRand()
+	iW = map.getGridWidth()
+	iH = map.getGridHeight()
 
 	if not _resolve_team_areas():
 		return None
@@ -642,50 +691,109 @@ def _assign_all_starting_plots():
 
 		teamPlayers = teamPlayersMap[iTeam]
 		teamPlayers.sort()
+		numInTeam = len(teamPlayers)
 		iTargetArea = teamAreaMap[iTeam]
+		label = teamRegionMap.get(iTeam, "")
+		(teamXMin, teamXMax, teamYMin, teamYMax) = _get_team_region_bounds(label, iW, iH)
 
-		for playerID in teamPlayers:
+		sliceOrder = []
+		for s in range(numInTeam):
+			sliceOrder.append(s)
+
+		for i in range(numInTeam):
+			j = mapRand.get(numInTeam, "Shuffle Slices")
+			temp = sliceOrder[i]
+			sliceOrder[i] = sliceOrder[j]
+			sliceOrder[j] = temp
+
+		for i in range(numInTeam):
+			playerID = teamPlayers[i]
 			player = gc.getPlayer(playerID)
 			player.AI_updateFoundValues(True)
 
-			currentMinDist = 10
-			plotAssigned = False
-			while currentMinDist >= 0 and not plotAssigned:
-				bestVal = -1
-				bestPlot = None
+			xMin, xMax = teamXMin, teamXMax
+			yMin, yMax = teamYMin, teamYMax
+			availXMin, availXMax = teamXMin, teamXMax
+			availYMin, availYMax = teamYMin, teamYMax
 
-				for x in range(map.getGridWidth()):
-					for y in range(map.getGridHeight()):
+			sliceIdx = sliceOrder[i]
+			fullXMin, fullXMax = xMin, xMax
+			fullYMin, fullYMax = yMin, yMax
+			sliceHeight = (availYMax - availYMin) / numInTeam
+			fullYMin = availYMin + (sliceIdx * sliceHeight)
+			fullYMax = fullYMin + sliceHeight
+			fullXMin = availXMin
+			fullXMax = availXMax
+			xMin = fullXMin
+			xMax = fullXMax
+			yMin = fullYMin
+			yMax = fullYMax
+			if sliceHeight > 8:
+				iSliceMargin = 4
+				yMin = fullYMin + iSliceMargin
+				yMax = fullYMax - iSliceMargin
+
+			yMin = max(0, yMin - 2)
+			yMax = min(iH - 1, yMax + 2)
+			xMin = max(0, xMin)
+			xMax = min(iW - 1, xMax)
+			fullXMin = max(0, fullXMin)
+			fullXMax = min(iW - 1, fullXMax)
+			fullYMin = max(0, fullYMin)
+			fullYMax = min(iH - 1, fullYMax)
+
+			searchBoxes = [(xMin, xMax, yMin, yMax)]
+			if fullXMin != xMin or fullXMax != xMax or fullYMin != yMin or fullYMax != yMax:
+				searchBoxes.append((fullXMin, fullXMax, fullYMin, fullYMax))
+
+			plotAssigned = False
+			for (searchXMin, searchXMax, searchYMin, searchYMax) in searchBoxes:
+				currentMinDist = 10
+				while currentMinDist >= 5 and not plotAssigned:
+					bestVal = -1
+					bestPlot = None
+
+					for x in range(searchXMin, searchXMax + 1):
+						for y in range(searchYMin, searchYMax + 1):
+							pPlot = map.plot(x, y)
+							if pPlot.isWater() or pPlot.isPeak(): continue
+							if pPlot.getArea() != iTargetArea: continue
+
+							tooClose = False
+							for (ax, ay) in assigned_plots:
+								if plotDistance(x, y, ax, ay) < currentMinDist:
+									tooClose = True
+									break
+							if tooClose: continue
+
+							val = pPlot.getFoundValue(playerID)
+							iEdgeDist = min(y - fullYMin, fullYMax - y)
+							if iEdgeDist < 0: iEdgeDist = 0
+							val -= (10 - min(10, iEdgeDist)) * 8
+							if val > bestVal:
+								bestVal = val
+								bestPlot = pPlot
+
+					if bestPlot is not None:
+						assignments[playerID] = map.plotNum(bestPlot.getX(), bestPlot.getY())
+						assigned_plots.append((bestPlot.getX(), bestPlot.getY()))
+						plotAssigned = True
+					else:
+						currentMinDist -= 1
+				if plotAssigned: break
+
+			if not plotAssigned:
+				for x in range(fullXMin, fullXMax + 1):
+					for y in range(fullYMin, fullYMax + 1):
 						pPlot = map.plot(x, y)
 						if pPlot.isWater() or pPlot.isPeak(): continue
 						if pPlot.getArea() != iTargetArea: continue
-
 						tooClose = False
 						for (ax, ay) in assigned_plots:
-							if plotDistance(x, y, ax, ay) < currentMinDist:
+							if plotDistance(x, y, ax, ay) < 5:
 								tooClose = True
 								break
 						if tooClose: continue
-
-						val = pPlot.getFoundValue(playerID)
-						if val > bestVal:
-							bestVal = val
-							bestPlot = pPlot
-
-				if bestPlot is not None:
-					assignments[playerID] = map.plotNum(bestPlot.getX(), bestPlot.getY())
-					assigned_plots.append((bestPlot.getX(), bestPlot.getY()))
-					plotAssigned = True
-				else:
-					currentMinDist -= 1
-
-			if not plotAssigned:
-				for x in range(map.getGridWidth()):
-					for y in range(map.getGridHeight()):
-						pPlot = map.plot(x, y)
-						if pPlot.isWater() or pPlot.isPeak(): continue
-						if pPlot.getArea() != iTargetArea: continue
-						if (x, y) in assigned_plots: continue
 						assignments[playerID] = map.plotNum(x, y)
 						assigned_plots.append((x, y))
 						plotAssigned = True
@@ -860,6 +968,64 @@ class ResourceManager:
 				iCount += 1
 		return iCount
 
+	def _get_team_region_plots(self, iTeam):
+		global teamRegionMap
+		global teamAreaMap
+		global _THEM_REGION_RECTS
+
+		plots = []
+		if not teamRegionMap.has_key(iTeam):
+			return plots
+
+		label = teamRegionMap[iTeam]
+		rects = _THEM_REGION_RECTS.get(label, [])
+		iArea = -1
+		if teamAreaMap.has_key(iTeam):
+			iArea = teamAreaMap[iTeam]
+
+		for rect in rects:
+			iWestX, iSouthY, iWidth, iHeight = rect
+			for x in range(iWestX, iWestX + iWidth):
+				for y in range(iSouthY, iSouthY + iHeight):
+					if x < 0 or x >= self.iW: continue
+					if y < 0 or y >= self.iH: continue
+					pPlot = self.map.plot(x, y)
+					if pPlot.isNone(): continue
+					if iArea != -1 and not pPlot.isWater():
+						if pPlot.getArea() != iArea: continue
+					plots.append(pPlot)
+
+		return plots
+
+	def _get_team_start_radius_plots(self, iTeam, radius):
+		plots = []
+		used = {}
+
+		if radius < 0:
+			radius = 0
+
+		for iPlayer in range(self.gc.getMAX_CIV_PLAYERS()):
+			pPlayer = self.gc.getPlayer(iPlayer)
+			if pPlayer.isEverAlive() and pPlayer.getTeam() == iTeam:
+				pStart = pPlayer.getStartingPlot()
+				if pStart and not pStart.isNone():
+					sx = pStart.getX()
+					sy = pStart.getY()
+					for dx in range(-radius, radius + 1):
+						for dy in range(-radius, radius + 1):
+							nx = sx + dx
+							ny = sy + dy
+							if nx >= 0 and nx < self.iW and ny >= 0 and ny < self.iH:
+								if plotDistance(sx, sy, nx, ny) <= radius:
+									key = ny * self.iW + nx
+									if not used.has_key(key):
+										pPlot = self.map.plot(nx, ny)
+										if not pPlot.isNone():
+											used[key] = 1
+											plots.append(pPlot)
+
+		return plots
+
 	def _get_region_plots(self, region):
 		plots = []
 
@@ -949,11 +1115,27 @@ class ResourceManager:
 
 		return present.keys()
 
+	def _start_plot_lookup(self):
+		startLookup = {}
+		for i in range(self.gc.getMAX_CIV_PLAYERS()):
+			player = self.gc.getPlayer(i)
+			if player.isEverAlive():
+				pStart = player.getStartingPlot()
+				if pStart and not pStart.isNone():
+					startLookup[(pStart.getX(), pStart.getY())] = 1
+		return startLookup
+
+	def _is_player_start_plot(self, pPlot, startLookup):
+		if pPlot.isStartingPlot():
+			return True
+		return startLookup.has_key((pPlot.getX(), pPlot.getY()))
+
 	def _valid_bonus_plots(self, region_plots, iBonus):
 		validPlots = []
+		startLookup = self._start_plot_lookup()
 		for pPlot in region_plots:
 			if pPlot.getBonusType(-1) != -1: continue
-			if pPlot.isStartingPlot(): continue
+			if self._is_player_start_plot(pPlot, startLookup): continue
 			if not pPlot.canHaveBonus(iBonus, True): continue
 			validPlots.append(pPlot)
 		return validPlots
@@ -988,9 +1170,10 @@ class ResourceManager:
 	def _fallback_bonus_plots(self, region_plots, iBonus, bMatchPlotType):
 		bWaterBonus = self._bonus_is_water(iBonus)
 		fallbackPlots = []
+		startLookup = self._start_plot_lookup()
 		for pPlot in region_plots:
 			if pPlot.getBonusType(-1) != -1: continue
-			if pPlot.isStartingPlot(): continue
+			if self._is_player_start_plot(pPlot, startLookup): continue
 			if bMatchPlotType:
 				if not self._bonus_matches_plot_type(pPlot, iBonus): continue
 			else:
@@ -1021,6 +1204,99 @@ class ResourceManager:
 					return False
 
 		return True
+
+	def place_bonus_in_radius(self, bonus_list, iTargetCount, iCopies, radius):
+		if iTargetCount < 1: iTargetCount = 1
+		if iCopies < 1: iCopies = 1
+
+		ids = []
+		for b in bonus_list:
+			ids.append(self._bonus_id(b))
+
+		players = []
+		startLookup = self._start_plot_lookup()
+		for i in range(self.gc.getMAX_CIV_PLAYERS()):
+			player = self.gc.getPlayer(i)
+			if player.isEverAlive():
+				pStart = player.getStartingPlot()
+				if pStart and not pStart.isNone():
+					players.append((player.getID(), pStart.getX(), pStart.getY()))
+
+		for (pid, sx, sy) in players:
+			present = {}
+
+			for dx in range(-radius, radius + 1):
+				for dy in range(-radius, radius + 1):
+					nx = sx + dx
+					ny = sy + dy
+					if nx >= 0 and nx < self.iW and ny >= 0 and ny < self.iH:
+						if plotDistance(sx, sy, nx, ny) <= radius:
+							pPlot = self.map.plot(nx, ny)
+							iBonus = pPlot.getBonusType(TeamTypes.NO_TEAM)
+							if iBonus in ids:
+								present[iBonus] = 1
+
+			iPresent = len(present.keys())
+			if iPresent >= iTargetCount:
+				print "THem radius bonus skipped player %d. Found %d existing bonus types" % (pid, iPresent)
+				continue
+
+			missing_ids = []
+			for iBonus in ids:
+				if not present.has_key(iBonus):
+					missing_ids.append(iBonus)
+
+			missing_ids = self._shuffle_list(missing_ids, "THem Radius Bonus Type")
+			iNeededTypes = iTargetCount - iPresent
+			if iNeededTypes > len(missing_ids): iNeededTypes = len(missing_ids)
+
+			for iType in range(iNeededTypes):
+				chosen_id = missing_ids[iType]
+				placed = 0
+
+				for iCopy in range(iCopies):
+					tier1_plots = []
+					for dx in range(-radius, radius + 1):
+						for dy in range(-radius, radius + 1):
+							nx = sx + dx
+							ny = sy + dy
+							if nx >= 0 and nx < self.iW and ny >= 0 and ny < self.iH:
+								if plotDistance(sx, sy, nx, ny) <= radius:
+									pPlot = self.map.plot(nx, ny)
+									if self._is_player_start_plot(pPlot, startLookup) or pPlot.getBonusType(-1) != -1: continue
+									if pPlot.isWater() or pPlot.isPeak(): continue
+
+									if self._is_bonus_appropriate_for_plot(chosen_id, pPlot):
+										tier1_plots.append(pPlot)
+
+					target_plot = None
+					if len(tier1_plots) > 0:
+						target_plot = tier1_plots[self.dice.get(len(tier1_plots), "THem Radius T1")]
+					else:
+						emergency_plots = []
+						for dx in range(-radius, radius + 1):
+							for dy in range(-radius, radius + 1):
+								nx = sx + dx
+								ny = sy + dy
+								if nx >= 0 and nx < self.iW and ny >= 0 and ny < self.iH:
+									if plotDistance(sx, sy, nx, ny) <= radius:
+										pPlot = self.map.plot(nx, ny)
+										if not pPlot.isWater() and not pPlot.isPeak() and not self._is_player_start_plot(pPlot, startLookup):
+											if pPlot.getBonusType(-1) == -1:
+												emergency_plots.append(pPlot)
+
+						if len(emergency_plots) > 0:
+							target_plot = emergency_plots[self.dice.get(len(emergency_plots), "THem Radius Emergency")]
+
+					if target_plot:
+						target_plot.setBonusType(chosen_id)
+						bonus_name = self.gc.getBonusInfo(chosen_id).getType()
+						self._debug_sign(target_plot, "THem radius " + bonus_name + " P" + str(pid))
+						print "THem radius placed %s for player %d at (%d, %d)" % (bonus_name, pid, target_plot.getX(), target_plot.getY())
+						placed += 1
+
+				if placed < iCopies:
+					print "THem radius placed only %d of %d copies for player %d" % (placed, iCopies, pid)
 
 	def place_food_bonus_in_BFC(self, bonusNames, iTargetCount, bCheckExisting):
 		if iTargetCount <= 0:
@@ -1153,6 +1429,63 @@ class ResourceManager:
 				placed += 1
 
 		return placed
+
+	def _wipe_bonus_types_in_plots(self, region_plots, bonusIDs, regionName):
+		removeLookup = {}
+		for iBonus in bonusIDs:
+			removeLookup[iBonus] = 1
+
+		iRemoved = 0
+		for pPlot in region_plots:
+			iBonus = pPlot.getBonusType(-1)
+			if removeLookup.has_key(iBonus):
+				self._debug_sign(pPlot, "THem removed " + self._bonus_name_from_id(iBonus) + " in " + regionName)
+				pPlot.setBonusType(-1)
+				iRemoved += 1
+
+		if iRemoved > 0:
+			print "THem wiped %d listed bonuses in %s" % (iRemoved, regionName)
+		return iRemoved
+
+	def place_balanced_team_resource(self, iTeam, bonusNames, iTargetCount, iCopies, bPlaceNear=False, radius=5):
+		bonusIDs = self._bonus_ids_from_names(bonusNames)
+		regionName = "team " + str(iTeam)
+		wipeRegionName = regionName
+
+		wipe_plots = self._get_team_region_plots(iTeam)
+		self._wipe_bonus_types_in_plots(wipe_plots, bonusIDs, wipeRegionName)
+
+		if bPlaceNear:
+			region_plots = self._get_team_start_radius_plots(iTeam, radius)
+			regionName = regionName + " near starts"
+		else:
+			bWaterGroup = False
+			for iBonus in bonusIDs:
+				if self._bonus_is_water(iBonus):
+					bWaterGroup = True
+					break
+			if bWaterGroup:
+				region_plots = self._get_adjacent_water_plots(wipe_plots)
+			else:
+				region_plots = wipe_plots
+
+		iPlayerCount = self._get_player_count_for_team(iTeam)
+
+		if len(region_plots) == 0:
+			print "THem balance found no plots for %s" % regionName
+			return 0
+
+		bonusIDs = self._shuffle_list(bonusIDs, "THem Region Bonus Types")
+		iNeeded = iTargetCount
+		if iNeeded > len(bonusIDs): iNeeded = len(bonusIDs)
+
+		iAttempted = 0
+		for i in range(iNeeded):
+			iBonus = bonusIDs[i]
+			self._place_bonus_copies(region_plots, iBonus, iCopies, regionName, self._bonus_name_from_id(iBonus), iPlayerCount)
+			iAttempted += 1
+
+		return iAttempted
 
 	def balance_bonus_types_in_continent(self, region, bonusNames, iTargetCount, iCopies):
 		regionName = str(region)
@@ -1300,46 +1633,46 @@ def normalizeAddExtras():
 	map = CyMap()
 	dice = gc.getGame().getMapRand()
 	map.recalculateAreas()
-	if bTeamPlacement:
-		_resolve_team_areas()
 	rm = ResourceManager(map, gc, dice)
 
-	iResourceOption = map.getCustomMapOption(5)
-	iTeamerBalancingOption = map.getCustomMapOption(6)
-	iStartFoodOption = map.getCustomMapOption(8)
+	iTeamerBalancingOption = map.getCustomMapOption(5)
+	iStartFoodOption = map.getCustomMapOption(7)
+	bCustomBalancing = False
 
-	if iResourceOption == 1:
-		balancer.normalizeAddExtras()
+	if bTeamPlacement and iTeamerBalancingOption == 1:
+		if _resolve_team_areas():
+			bCustomBalancing = True
 
-	if iTeamerBalancingOption == 1:
+	if bCustomBalancing:
 		print "PY: Teamer balancing regional resource groups..."
-		CalendarBonus = ["BONUS_SPICES", "BONUS_SUGAR", "BONUS_BANANA", "BONUS_DYE", "BONUS_INCENSE", "BONUS_SILK"]
-		Strategics = ["BONUS_IRON", "BONUS_COPPER", "BONUS_HORSE"] # This will be redundant if Balanced resources is on
+
+		Strategics = ["BONUS_IRON", "BONUS_COPPER", "BONUS_HORSE"]
 		SemiStrategics = ["BONUS_IVORY", "BONUS_STONE", "BONUS_MARBLE"]
 		PreciousMetals = ["BONUS_GOLD", "BONUS_SILVER", "BONUS_GEMS"]
 		EarlyHappiness = ["BONUS_FUR", "BONUS_WINE"]
-		Seafood = ["BONUS_FISH", "BONUS_CLAM", "BONUS_CRAB"]
+		CalendarBonus = ["BONUS_SPICES", "BONUS_SUGAR", "BONUS_BANANA", "BONUS_DYE", "BONUS_INCENSE", "BONUS_SILK"]
+		WaterBonus = ["BONUS_FISH", "BONUS_CRAB", "BONUS_CRAB", "BONUS_WHALE"]
 
-		teamRegions = []
+		rm.swap_resources("BONUS_IVORY", None)
+		rm.place_bonus_in_radius(Strategics, 3, 1, 5)
+
 		sortedTeams = teamRegionMap.keys()
 		sortedTeams.sort()
 		for iTeam in sortedTeams:
-			teamRegions.append((iTeam, teamRegionMap[iTeam]))
-
-		for iTeam, teamRegion in teamRegions:
 			iPlayerCount = rm._get_player_count_for_team(iTeam)
-			iCopies = int(0.5 * iPlayerCount) + 1
-			if iCopies < 1: iCopies = 1
+			iRoundedDown = int(0.5 * iPlayerCount)
+			iRoundedUp = int(0.5 * iPlayerCount + 1)
+			if iRoundedDown < 1: iRoundedDown = 1
 
-			rm.balance_bonus_types_in_continent(teamRegion, CalendarBonus, 4, iCopies)
-			rm.balance_bonus_types_in_continent(teamRegion, SemiStrategics, 3, iCopies)
-			rm.balance_bonus_types_in_continent(teamRegion, PreciousMetals, 2, iCopies)
-			rm.balance_bonus_types_in_continent(teamRegion, EarlyHappiness, 2, iCopies)
-			rm.add_bonus_types_to_continent(teamRegion, Seafood, iPlayerCount*2)
+			rm.place_balanced_team_resource(iTeam, CalendarBonus, 4, iRoundedDown)
+			rm.place_balanced_team_resource(iTeam, PreciousMetals, 3, iRoundedUp)
+			rm.place_balanced_team_resource(iTeam, EarlyHappiness, 2, iRoundedUp)
+			rm.place_balanced_team_resource(iTeam, SemiStrategics, 3, iRoundedDown, True, 4)
 
 	if iStartFoodOption > 0:
 		print "PY: Teamer adding starting plot food bonuses..."
 		FoodBonus = ["BONUS_WHEAT", "BONUS_RICE", "BONUS_CORN", "BONUS_COW", "BONUS_SHEEP", "BONUS_PIG", "BONUS_DEER"]
 		rm.place_food_bonus_in_BFC(FoodBonus, iStartFoodOption, True)
 
-	CyPythonMgr().allowDefaultImpl()
+	if not bCustomBalancing:
+		CyPythonMgr().allowDefaultImpl()
