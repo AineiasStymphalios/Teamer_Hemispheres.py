@@ -108,7 +108,7 @@ def getCustomMapOptionDefault(argsList):
 	elif iOption == 4: return 1
 	elif iOption == 5: return 2
 	elif iOption == 6: return 1
-	elif iOption == 7: return 1
+	elif iOption == 7: return 0
 	return 0
 
 def getWrapX():
