@@ -5,6 +5,7 @@
 
 
 from CvPythonExtensions import *
+import math
 import CvUtil
 import CvMapGeneratorUtil
 from CvMapGeneratorUtil import FractalWorld
@@ -35,90 +36,88 @@ def getNumCustomMapOptions():
 def getCustomMapOptionName(argsList):
 	[iOption] = argsList
 	if iOption == 0:
-		return "Continent Size"
-	elif iOption == 1:
-		return "Island Size"
-	elif iOption == 2:
-		return "Number of Continents"
-	elif iOption == 3:
 		return "World Wrap"
+	elif iOption == 1:
+		return "Number of Continents"
+	elif iOption == 2:
+		return "Continent Shoreline"
+	elif iOption == 3:
+		return "Continent Shape"
 	elif iOption == 4:
-		return "Axial Tilt"
-	elif iOption == 5:
 		return "Teamer Resource Balancing"
+	elif iOption == 5:
+		return "Land Food Across Map"
 	elif iOption == 6:
-		return "Debug Signs"
+		return "Land Food on Starts"
 	elif iOption == 7:
-		return "StartPlot Min Land Food"
+		return "Debug Signs"
 	return ""
 	
 def getNumCustomMapOptionValues(argsList):
 	[iOption] = argsList
-	if iOption == 0: return 4
+	if iOption == 0: return 3
 	elif iOption == 1: return 2
-	elif iOption == 2: return 5
-	elif iOption == 3: return 3
+	elif iOption == 2: return 3
+	elif iOption == 3: return 2
 	elif iOption == 4: return 2
-	elif iOption == 5: return 2
-	elif iOption == 6: return 2
-	elif iOption == 7: return 4
+	elif iOption == 5: return 4
+	elif iOption == 6: return 4
+	elif iOption == 7: return 2
 	return 0
 	
 def getCustomMapOptionDescAt(argsList):
 	[iOption, iSelection] = argsList
 	if iOption == 0:
-		if iSelection == 0: return "Massive Continents"
-		elif iSelection == 1: return "Normal Continents"
-		elif iSelection == 2: return "Snaky Continents"
-		return "Varied"
-	elif iOption == 1:
-		if iSelection == 0: return "Islands"
-		return "Tiny Islands"
-	elif iOption == 2:
-		if iSelection == 0: return "2"
-		elif iSelection == 1: return "3"
-		elif iSelection == 2: return "4"
-		elif iSelection == 3: return "5"
-		return "6"
-	elif iOption == 3:
 		if iSelection == 0: return "Flat"
 		elif iSelection == 1: return "Cylindrical"
 		return "Toroidal"
+	elif iOption == 1:
+		if iSelection == 0: return "2"
+		return "3"
+	elif iOption == 2:
+		if iSelection == 0: return "Pressed"
+		elif iSelection == 1: return "Natural"
+		return "Fjord"
+	elif iOption == 3:
+		if iSelection == 0: return "Fractal"
+		return "Solid"
 	elif iOption == 4:
-		if iSelection == 0: return "0 Degrees"
-		return "90 Degrees"
+		if iSelection == 0: return "Disabled"
+		return "Enabled"
 	elif iOption == 5:
 		if iSelection == 0: return "Disabled"
-		return "Enabled"
+		elif iSelection == 1: return "1 per 4x4 tiles"
+		elif iSelection == 2: return "1 per 5x5 tiles"
+		return "1 per 6x6 tiles"
 	elif iOption == 6:
-		if iSelection == 0: return "Disabled"
-		return "Enabled"
-	elif iOption == 7:
 		if iSelection == 0: return "Disabled"
 		elif iSelection == 1: return "At least 1"
 		elif iSelection == 2: return "At least 2"
 		return "At least 3"
+	elif iOption == 7:
+		if iSelection == 0: return "Disabled"
+		return "Enabled"
 	return ""
 
 def getCustomMapOptionDefault(argsList):
 	[iOption] = argsList
-	if iOption == 0: return 0
-	elif iOption == 1: return 1
+	if iOption == 0: return 1
+	elif iOption == 1: return 0
 	elif iOption == 2: return 0
 	elif iOption == 3: return 1
-	elif iOption == 4: return 0
-	elif iOption == 5: return 1
+	elif iOption == 4: return 1
+	elif iOption == 5: return 2
 	elif iOption == 6: return 1
 	elif iOption == 7: return 1
 	return 0
 
 def getWrapX():
 	map = CyMap()
-	return (map.getCustomMapOption(3) == 1 or map.getCustomMapOption(3) == 2)
+	return (map.getCustomMapOption(0) == 1 or map.getCustomMapOption(0) == 2)
 
 def getWrapY():
 	map = CyMap()
-	return (map.getCustomMapOption(3) == 2)
+	return (map.getCustomMapOption(0) == 2)
 
 def minStartingDistanceModifier():
 	return -12
@@ -148,7 +147,7 @@ def beforeGeneration():
 	teamRegionMap.clear()
 	teamAreaMap.clear()
 	bTeamPlacement = False
-	bDebugSignsEnabled = (map.getCustomMapOption(6) == 1)
+	bDebugSignsEnabled = (map.getCustomMapOption(7) == 1)
 
 	activeTeams = []
 	for iPlayer in range(gc.getMAX_CIV_PLAYERS()):
@@ -160,323 +159,325 @@ def beforeGeneration():
 
 	activeTeams.sort()
 	iNumTeams = len(activeTeams)
-	iRegionCount = 2 + map.getCustomMapOption(2)
-	vSplitPrimary, vSplitSecondary, vSplitTertiary, tripleSplit = THemContinentRegionBuilder.getSplitSettings(iRegionCount)
+	iRegionCount = 2 + map.getCustomMapOption(1)
 
 	if iNumTeams == 2:
 		bTeamPlacement = True
-		teamRegionMap[activeTeams[0]] = "primary"
-		teamRegionMap[activeTeams[1]] = "secondary"
-	elif iNumTeams == 3 and tripleSplit:
+		teamRegionMap[activeTeams[0]] = "ColumnL"
+		teamRegionMap[activeTeams[1]] = "ColumnR"
+	elif iNumTeams == 3 and iRegionCount == 3:
 		bTeamPlacement = True
-		teamRegionMap[activeTeams[0]] = "primary"
-		teamRegionMap[activeTeams[1]] = "secondary"
-		teamRegionMap[activeTeams[2]] = "tertiary"
+		teamRegionMap[activeTeams[0]] = "ColumnL"
+		teamRegionMap[activeTeams[1]] = "ColumnR"
+		teamRegionMap[activeTeams[2]] = "ColumnC"
 
 	if bTeamPlacement:
 		print "THem team placement enabled:", teamRegionMap
 
-class THemMultilayeredFractal(CvMapGeneratorUtil.MultilayeredFractal):
-	def generateIslandRegion(self, minTinies, extraTinies, iWestX, iSouthY, iWidth, iHeight, iGrain):
-		numTinies = minTinies + self.dice.get(extraTinies, "Tiny Islands - Custom Continents PYTHON")
-		print("Patches of Tiny Islands: ", numTinies)
-		if numTinies:
-			for tiny_loop in range(numTinies):
-				tinyWidth = int(self.iW * 0.20)
-				tinyHeight = int(self.iH * 0.20)
-				iXRange = iWidth - tinyWidth
-				iYRange = iHeight - tinyHeight
-				if iXRange < 0:
-					iXRange = 0
-					tinyWidth = iWidth
-				if iYRange < 0:
-					iYRange = 0
-					tinyHeight = iHeight
-				tinyWestX = iWestX
-				tinySouthY = iSouthY
-				if iXRange > 0:
-					tinyWestX += self.dice.get(iXRange, "Tiny Longitude - Custom Continents PYTHON")
-				if iYRange > 0:
-					tinySouthY += self.dice.get(iYRange, "Tiny Latitude - Custom Continents PYTHON")
+class GeometricMultiFractal(CvMapGeneratorUtil.MultilayeredFractal):
+	"""
+	Fractal generator supporting geometric masking and rotation.
+	Shapes: RECT, ELLIPSE, ISOTRI.
+	"""
+	def getReducedEdgeWaterThreshold(self, r_type, water_prc, iWaterThreshold, iWaterThresholds,
+	rx, ry, invRxSq, invRySq, radius_x, radius_y,
+	height_tiles, b_dist, v_dist, max_rx):
+		fCenterInner = 0.45
+		fCenterOuter = 0.65
+		fCenterMultiplier = 2.0
+		fEdgeInner = 0.80
+		fEdgeOuter = 1.00
+		fEdgeMultiplier = 1.0
+		fIsotriEdgeBand = 0.20
+		edgeStrength = 0.0
+		centerStrength = 0.0
+		shape_fill = 0.0
+		if r_type == "ELLIPSE":
+			shape_fill = math.sqrt((rx*rx * invRxSq) + (ry*ry * invRySq))
+		elif r_type == "ISOTRI":
+			edgeBand = min(radius_x, height_tiles) * fIsotriEdgeBand
+			edgeMargin = min(ry + b_dist, v_dist - ry, max_rx - abs(rx))
+			if edgeBand <= 0:
+				shape_fill = 1.0
+			else:
+				shape_fill = 1.0 - (edgeMargin / edgeBand)
+		else:
+			if radius_x > 0: shape_fill = abs(rx) / radius_x
+			if radius_y > 0:
+				y_fill = abs(ry) / radius_y
+				if y_fill > shape_fill: shape_fill = y_fill
+		if shape_fill < fCenterInner:
+			centerStrength = 1.0 * fCenterMultiplier
+		elif shape_fill < fCenterOuter:
+			if fCenterOuter > fCenterInner:
+				centerStrength = ((fCenterOuter - shape_fill) / (fCenterOuter - fCenterInner)) * fCenterMultiplier
+		if shape_fill > fEdgeInner:
+			if fEdgeOuter > fEdgeInner:
+				edgeStrength = ((shape_fill - fEdgeInner) / (fEdgeOuter - fEdgeInner)) * fEdgeMultiplier
+		if edgeStrength > 1.0: edgeStrength = 1.0
+		if centerStrength > 1.0: centerStrength = 1.0
+		if edgeStrength > 0.0:
+			iLocalWaterPercent = water_prc + int((100 - water_prc) * edgeStrength)
+			if iLocalWaterPercent > 100: iLocalWaterPercent = 100
+			return iWaterThresholds[iLocalWaterPercent]
+		elif centerStrength > 0.0:
+			iLocalWaterPercent = int(water_prc * (1.0 - centerStrength))
+			if iLocalWaterPercent < 0: iLocalWaterPercent = 0
+			return iWaterThresholds[iLocalWaterPercent]
 
-				self.generatePlotsInRegion(85,
-										   tinyWidth, tinyHeight,
-										   tinyWestX, tinySouthY,
-										   iGrain, 3,
-										   0, self.iTerrainFlags,
-										   6, 5,
-										   True, 3,
-										   -1, False,
-										   False
-										   )
-		return 0
-
-	def generateContinentRegion(self, iWater, iWidth, iHeight, iWestX, iSouthY, iGrain, xExp):
-		self.generatePlotsInRegion(iWater,
-								   iWidth, iHeight,
-								   iWestX, iSouthY,
-								   iGrain, 4,
-								   self.iRoundFlags, self.iTerrainFlags,
-								   xExp, 6,
-								   True, 15,
-								   -1, False,
-								   False
-								   )
-		return 0
+		return iWaterThreshold
 
 	def generatePlotsByRegion(self, region_data):
-		for data in region_data:
-			kind = data[0]
-			if kind == "continent":
-				name, iWater, iWestX, iSouthY, iWidth, iHeight, iGrain, xExp = data[1:]
-				print(name, "West:", iWestX, "South:", iSouthY, "Width:", iWidth, "Height:", iHeight)
-				self.generateContinentRegion(iWater, iWidth, iHeight, iWestX, iSouthY, iGrain, xExp)
-			elif kind == "islands":
-				name, minTinies, extraTinies, iWestX, iSouthY, iWidth, iHeight, iGrain = data[1:]
-				print(name, "West:", iWestX, "South:", iSouthY, "Width:", iWidth, "Height:", iHeight)
-				self.generateIslandRegion(minTinies, extraTinies, iWestX, iSouthY, iWidth, iHeight, iGrain)
+		sea = 0 
+		
+		# Define Terrain Profiles: (HillDensity%, PeakDensity%_of_Hills)
+		terrain_profiles = {
+			"flat":         (15, 1),
+			"plateau":      (50, 30),
+			"highland":     (75, 40),
+			"alpine":       (95, 60),
+			"default":      (30, 20)
+		}
+		
+		gc = CyGlobalContext()
+		m = CyMap()
+		iRocky = gc.getInfoTypeForString("CLIMATE_ROCKY")
+		if m.getClimate() == iRocky:
+			for key in terrain_profiles.keys():
+				h_dens, p_dens = terrain_profiles[key]
+				new_h = int(h_dens * 1.2)
+				new_p = int(p_dens * 1.1)
+				if new_h > 100: new_h = 100
+				if new_p > 100: new_p = 100
+				terrain_profiles[key] = (new_h, new_p)
 
-		print "Done"
+		for data in region_data:
+			name, r_type_raw, cx, cy, d1, d2, d3, terrain, grain, h_grain, water_prc, bReduceEdges = data
+			r_type = r_type_raw.upper()
+			
+			# 1. Coordinate Math
+			center_x = cx * self.iW
+			center_y = cy * self.iH
+			radius_x = (d1 / 2.0) * self.iW
+			radius_y = (d2 / 2.0) * self.iH
+			height_tiles = d2 * self.iH
+
+			# Rotation/Geometry Math
+			rad = -math.radians(d3)
+			cosA, sinA = math.cos(rad), math.sin(rad)
+			v_dist, b_dist = (2.0 / 3.0) * height_tiles, (1.0 / 3.0) * height_tiles
+			invRxSq, invRySq = 0.0, 0.0
+			if radius_x > 0: invRxSq = 1.0 / (radius_x * radius_x)
+			if radius_y > 0: invRySq = 1.0 / (radius_y * radius_y)
+
+			if r_type == "ELLIPSE":
+				x_extent = math.sqrt((radius_x * cosA) * (radius_x * cosA) + (radius_y * sinA) * (radius_y * sinA))
+				y_extent = math.sqrt((radius_x * sinA) * (radius_x * sinA) + (radius_y * cosA) * (radius_y * cosA))
+				min_x = -x_extent
+				max_x = x_extent
+				min_y = -y_extent
+				max_y = y_extent
+			elif r_type == "ISOTRI":
+				points = [(-radius_x, -b_dist), (radius_x, -b_dist), (0.0, v_dist)]
+				min_x = 0.0
+				max_x = 0.0
+				min_y = 0.0
+				max_y = 0.0
+				for iPoint in range(len(points)):
+					local_x, local_y = points[iPoint]
+					world_dx = local_x * cosA + local_y * sinA
+					world_dy = -local_x * sinA + local_y * cosA
+					if iPoint == 0 or world_dx < min_x: min_x = world_dx
+					if iPoint == 0 or world_dx > max_x: max_x = world_dx
+					if iPoint == 0 or world_dy < min_y: min_y = world_dy
+					if iPoint == 0 or world_dy > max_y: max_y = world_dy
+			else:
+				x_extent = abs(radius_x * cosA) + abs(radius_y * sinA)
+				y_extent = abs(radius_x * sinA) + abs(radius_y * cosA)
+				min_x = -x_extent
+				max_x = x_extent
+				min_y = -y_extent
+				max_y = y_extent
+			
+			iWest = max(0, int(center_x + min_x))
+			iEast = min(self.iW - 1, int(center_x + max_x))
+			iSouth = max(0, int(center_y + min_y))
+			iNorth = min(self.iH - 1, int(center_y + max_y))
+			
+			reg_w, reg_h = iEast - iWest + 1, iNorth - iSouth + 1
+			if reg_w <= 0 or reg_h <= 0: continue
+
+			# 2. Fractal Initialization
+			NiTextOut("Generating %s (Geometric Fractal) ..." % name)
+			
+			# This fractal is now shared by BOTH Land and Water regions
+			regionContFrac = CyFractal()
+			regionContFrac.fracInit(reg_w, reg_h, grain, self.dice, self.iFlags, -1, -1)
+			
+			# Calculate threshold for the "Active" part of the fractal
+			if water_prc <= 0:
+				iWaterThreshold = -1
+			elif water_prc >= 100:
+				iWaterThreshold = 255
+			else:
+				iWaterThreshold = regionContFrac.getHeightFromPercent(water_prc + sea)
+
+			is_subtractive = (terrain == "water")
+			iWaterThresholds = []
+			if bReduceEdges and not is_subtractive and water_prc > 0 and water_prc < 100:
+				for iPercent in range(101):
+					iWaterThresholds.append(regionContFrac.getHeightFromPercent(iPercent))
+
+			# Only Land regions need Hill/Peak fractals
+			if not is_subtractive:
+				regionHillsFrac = CyFractal()
+				regionPeaksFrac = CyFractal()
+				regionHillsFrac.fracInit(reg_w, reg_h, h_grain, self.dice, 0, -1, -1)
+				regionPeaksFrac.fracInit(reg_w, reg_h, h_grain+1, self.dice, 0, -1, -1)
+
+				h_dens, p_dens = terrain_profiles.get(terrain, terrain_profiles["default"])
+				iHillThreshold = regionHillsFrac.getHeightFromPercent(100 - h_dens)
+				iPeakThreshold = regionPeaksFrac.getHeightFromPercent(100 - p_dens)
+
+			# 3. Iterate over the grid
+			for x in range(reg_w):
+				world_x = x + iWest
+				# Add 0.5 to world_x to get the center of the tile
+				dx = (float(world_x) + 0.5) - center_x
+				for y in range(reg_h):
+					world_y = y + iSouth
+					# Add 0.5 to world_y to get the center of the tile
+					dy = (float(world_y) + 0.5) - center_y
+
+					# Now, tiles on either side of an even-numbered split will have 
+					# identical distance values (e.g., -0.5 and 0.5).
+					# Geometry Check
+					rx = dx * cosA - dy * sinA
+					ry = dx * sinA + dy * cosA
+					is_inside = False
+					max_rx = 0.0
+					if r_type == "ELLIPSE":
+						if (rx*rx * invRxSq) + (ry*ry * invRySq) <= 1.0: is_inside = True
+					elif r_type == "ISOTRI":
+						if ry >= -b_dist and ry <= v_dist:
+							max_rx = radius_x * (v_dist - ry) / height_tiles
+							if abs(rx) <= max_rx: is_inside = True
+					else: # RECT
+						if abs(rx) <= radius_x and abs(ry) <= radius_y: is_inside = True
+
+					if not is_inside: continue
+						
+					# Decide plot type
+					world_i = world_y * self.iW + world_x
+					val = regionContFrac.getHeight(x, y)
+					# Edge reduction
+					iLocalWaterThreshold = iWaterThreshold
+					if bReduceEdges and not is_subtractive and water_prc > 0 and water_prc < 100:
+						iLocalWaterThreshold = self.getReducedEdgeWaterThreshold(
+							r_type, water_prc, iWaterThreshold, iWaterThresholds,
+							rx, ry, invRxSq, invRySq, radius_x, radius_y,
+							height_tiles, b_dist, v_dist, max_rx)
+					
+					if is_subtractive:
+						# WATER REGION: If fractal roll is within the water percent, punch a hole.
+						# Setting water_prc=100 will now correctly turn every tile to ocean.
+						if val <= iLocalWaterThreshold:
+							self.wholeworldPlotTypes[world_i] = PlotTypes.PLOT_OCEAN
+					else:
+						# LAND REGION: Skip tiles within the water percent threshold (remains ocean).
+						if val <= iLocalWaterThreshold: 
+							continue
+						
+						# Process Hills and Peaks for land
+						if regionHillsFrac.getHeight(x, y) >= iHillThreshold:
+							if regionPeaksFrac.getHeight(x, y) >= iPeakThreshold:
+								self.wholeworldPlotTypes[world_i] = PlotTypes.PLOT_PEAK
+							else:
+								self.wholeworldPlotTypes[world_i] = PlotTypes.PLOT_HILLS
+						else:
+							self.wholeworldPlotTypes[world_i] = PlotTypes.PLOT_LAND
+							
 		return self.wholeworldPlotTypes
 
-class THemContinentRegionBuilder:
-	def __init__(self, map, gc):
-		self.map = map
-		self.gc = gc
-		self.iW = map.getGridWidth()
-		self.iH = map.getGridHeight()
-		self.regionRects = {}
+class THem_RegionMaskManager:
+	def makeRegionMask(self, centerX, centerY, width, height, angle, iW, iH):
+		center_x = centerX * iW
+		center_y = centerY * iH
+		radius_x = (width / 2.0) * iW
+		radius_y = (height / 2.0) * iH
+		rad = -math.radians(angle)
+		cosA = math.cos(rad)
+		sinA = math.sin(rad)
+		x_extent = abs(radius_x * cosA) + abs(radius_y * sinA)
+		y_extent = abs(radius_x * sinA) + abs(radius_y * cosA)
 
-	def getSplitSettings(iRegionCount):
-		if iRegionCount == 2:
-			return (0, 0, 0, 0)
-		elif iRegionCount == 3:
-			return (0, 0, 0, 1)
-		elif iRegionCount == 4:
-			return (1, 1, 0, 0)
-		elif iRegionCount == 5:
-			return (0, 1, 1, 1)
-		elif iRegionCount == 6:
-			return (1, 1, 1, 1)
-		return (0, 0, 0, 0)
-	getSplitSettings = staticmethod(getSplitSettings)
+		iWestX = int(center_x - x_extent)
+		iEastX = int(center_x + x_extent)
+		iSouthY = int(center_y - y_extent)
+		iNorthY = int(center_y + y_extent)
 
-	def getContinentSettings(self):
-		iSeaLevelChange = self.gc.getSeaLevelInfo(self.map.getSeaLevel()).getSeaLevelChange()
-		print("getSeaLevelChange", iSeaLevelChange)
+		if iWestX < 0: iWestX = 0
+		if iEastX > iW - 1: iEastX = iW - 1
+		if iSouthY < 0: iSouthY = 0
+		if iNorthY > iH - 1: iNorthY = iH - 1
 
-		iContinentOption = self.map.getCustomMapOption(0)
-		if iContinentOption == 3:
-			return {
-				"primary": (1, 80 + iSeaLevelChange),
-				"secondary": (3, 70 + iSeaLevelChange),
-				"tertiary": (2, 75 + iSeaLevelChange)
-				}
-		elif iContinentOption == 0:
-			iGrain = 1
-		else:
-			iGrain = 2 + iContinentOption
+		iWidth = iEastX - iWestX + 1
+		iHeight = iNorthY - iSouthY + 1
+		if iWidth < 1: iWidth = 1
+		if iHeight < 1: iHeight = 1
 
-		return {
-			"primary": (iGrain, 70 + iSeaLevelChange),
-			"secondary": (iGrain, 70 + iSeaLevelChange),
-			"tertiary": (iGrain, 70 + iSeaLevelChange)
-			}
+		return (centerX, centerY, width, height, angle, iWestX, iSouthY, iWidth, iHeight)
 
-	def shrinkRegion(self, iWestX, iSouthY, iWidth, iHeight):
-		iMarginX = int(0.05 * self.iW)
-		iMarginY = int(0.0 * self.iH)
+	def getRegionMaskBounds(self, regionMask, iW, iH):
+		if len(regionMask) == 4:
+			return regionMask
+		return (regionMask[5], regionMask[6], regionMask[7], regionMask[8])
 
-		if iMarginX < 1: iMarginX = 1
-		if iMarginY < 1: iMarginY = 1
+	def plotInRegionMask(self, regionMask, x, y, iW, iH):
+		if len(regionMask) == 4:
+			iWestX, iSouthY, iWidth, iHeight = regionMask
+			if x < iWestX or x >= iWestX + iWidth: return False
+			if y < iSouthY or y >= iSouthY + iHeight: return False
+			return True
 
-		if iWidth <= (2 * iMarginX) + 4:
-			iMarginX = 0
-		if iHeight <= (2 * iMarginY) + 4:
-			iMarginY = 0
+		centerX, centerY, width, height, angle, iWestX, iSouthY, iWidth, iHeight = regionMask
+		center_x = centerX * iW
+		center_y = centerY * iH
+		radius_x = (width / 2.0) * iW
+		radius_y = (height / 2.0) * iH
+		rad = -math.radians(angle)
+		cosA = math.cos(rad)
+		sinA = math.sin(rad)
+		dx = (float(x) + 0.5) - center_x
+		dy = (float(y) + 0.5) - center_y
+		rx = dx * cosA - dy * sinA
+		ry = dx * sinA + dy * cosA
+		if abs(rx) > radius_x: return False
+		if abs(ry) > radius_y: return False
+		return True
 
-		return (iWestX + iMarginX, iSouthY + iMarginY, iWidth - (2 * iMarginX), iHeight - (2 * iMarginY))
+	def plotInRegionMasks(self, regionMasks, x, y, iW, iH):
+		if len(regionMasks) == 0:
+			return True
+		for regionMask in regionMasks:
+			if self.plotInRegionMask(regionMask, x, y, iW, iH):
+				return True
+		return False
 
-	def getCoreRegion(self, iWestX, iSouthY, iWidth, iHeight):
-		iCoreWidth = int(0.50 * iWidth)
-		iCoreHeight = int(0.60 * iHeight)
+regionMaskManager = THem_RegionMaskManager()
 
-		if iCoreWidth < 4: iCoreWidth = iWidth
-		if iCoreHeight < 4: iCoreHeight = iHeight
-
-		iCoreWestX = iWestX + ((iWidth - iCoreWidth) / 2)
-		iCoreSouthY = iSouthY + ((iHeight - iCoreHeight) / 2)
-		return (iCoreWestX, iCoreSouthY, iCoreWidth, iCoreHeight)
-
-	def getHorizontalBand(self, label, tripleSplit):
-		global xShiftRoll
-
-		if label == "tertiary":
-			westShift = int(0.66 * self.iW)
-			eastShift = 0
-		elif label == "primary":
-			if tripleSplit:
-				if xShiftRoll:
-					westShift = int(0.33 * self.iW)
-					eastShift = int(0.33 * self.iW)
-				else:
-					westShift = 0
-					eastShift = int(0.66 * self.iW)
-			else:
-				if xShiftRoll:
-					westShift = int(0.5 * self.iW)
-					eastShift = 0
-				else:
-					westShift = 0
-					eastShift = int(0.5 * self.iW)
-		else:
-			if tripleSplit:
-				if xShiftRoll:
-					westShift = 0
-					eastShift = int(0.66 * self.iW)
-				else:
-					westShift = int(0.33 * self.iW)
-					eastShift = int(0.33 * self.iW)
-			else:
-				if xShiftRoll:
-					westShift = 0
-					eastShift = int(0.5 * self.iW)
-				else:
-					westShift = int(0.5 * self.iW)
-					eastShift = 0
-
-		iWestX = westShift
-		iEastX = self.iW - eastShift
-		return (iWestX, iEastX - iWestX)
-
-	def getVerticalBands(self, vSplit):
-		global yShiftRoll
-		global yPortionRoll
-
-		if not vSplit:
-			return [(0, self.iH)]
-
-		splitYBigger = 0.5
-		splitYSmaller = 0.5
-		splitYBuffer = 0.1
-
-		if yPortionRoll:
-			if yShiftRoll:
-				firstNorth = int(splitYBuffer * self.iH)
-				firstSouth = int(splitYBigger * self.iH)
-				secondNorth = int(splitYSmaller * self.iH)
-				secondSouth = int(splitYBuffer * self.iH)
-			else:
-				firstNorth = int(splitYSmaller * self.iH)
-				firstSouth = int(splitYBuffer * self.iH)
-				secondNorth = int(splitYBuffer * self.iH)
-				secondSouth = int(splitYBigger * self.iH)
-		else:
-			if yShiftRoll:
-				firstNorth = int(splitYBuffer * self.iH)
-				firstSouth = int(splitYSmaller * self.iH)
-				secondNorth = int(splitYBigger * self.iH)
-				secondSouth = int(splitYBuffer * self.iH)
-			else:
-				firstNorth = int(splitYBigger * self.iH)
-				firstSouth = int(splitYBuffer * self.iH)
-				secondNorth = int(splitYBuffer * self.iH)
-				secondSouth = int(splitYSmaller * self.iH)
-
-		return [
-			(firstSouth, self.iH - firstNorth - firstSouth),
-			(secondSouth, self.iH - secondNorth - secondSouth)
-			]
-
-	def getIslandStripRegions(self, iWestX, iSouthY, iWidth, iHeight):
-		iCutHeight = int(0.20 * self.iH)
-		if iCutHeight < 1:
-			iCutHeight = 1
-		if iCutHeight > iHeight:
-			iCutHeight = iHeight
-
-		return (
-			(iWestX, iSouthY, iWidth, iCutHeight),
-			(iWestX, iSouthY + iHeight - iCutHeight, iWidth, iCutHeight)
-			)
-
-	def getIslandCounts(self, label, vSplit):
-		if vSplit:
-			minTinies = 1
-			extraTinies = 2
-			if label != "primary":
-				minTinies = 2
-				extraTinies = 3
-		else:
-			minTinies = 2
-			extraTinies = 3
-			if label != "primary":
-				minTinies = 3
-				extraTinies = 4
-		return (minTinies, extraTinies)
-
-	def appendRegionRect(self, label, rect):
-		if not self.regionRects.has_key(label):
-			self.regionRects[label] = []
-		self.regionRects[label].append(rect)
-
-	def addContinentRegions(self, region_data, label, vSplit, tripleSplit, settings, iIslandsGrain, tinyIslandOverlap):
-		iWestX, iWidth = self.getHorizontalBand(label, tripleSplit)
-		iGrain, iWater = settings[label]
-		xExp = 6
-		bands = self.getVerticalBands(vSplit)
-		minTinies, extraTinies = self.getIslandCounts(label, vSplit)
-
-		for i in range(len(bands)):
-			iSouthY, iHeight = bands[i]
-			iContWestX, iContSouthY, iContWidth, iContHeight = self.shrinkRegion(iWestX, iSouthY, iWidth, iHeight)
-			region_data.append(("continent", label + " shoreline", iWater, iContWestX, iContSouthY, iContWidth, iContHeight, iGrain, xExp))
-			iCoreWestX, iCoreSouthY, iCoreWidth, iCoreHeight = self.getCoreRegion(iContWestX, iContSouthY, iContWidth, iContHeight)
-			region_data.append(("continent", label + " core", 30, iCoreWestX, iCoreSouthY, iCoreWidth, iCoreHeight, 1, xExp))
-			self.appendRegionRect(label, (iContWestX, iContSouthY, iContWidth, iContHeight))
-			if tinyIslandOverlap == 0:
-				islandRects = self.getIslandStripRegions(iContWestX, iContSouthY, iContWidth, iContHeight)
-				iIslandWestX, iIslandSouthY, iIslandWidth, iIslandHeight = islandRects[0]
-				region_data.append(("islands", label + " south islands", minTinies, extraTinies, iIslandWestX, iIslandSouthY, iIslandWidth, iIslandHeight, iIslandsGrain))
-				iIslandWestX, iIslandSouthY, iIslandWidth, iIslandHeight = islandRects[1]
-				region_data.append(("islands", label + " north islands", minTinies, extraTinies, iIslandWestX, iIslandSouthY, iIslandWidth, iIslandHeight, iIslandsGrain))
-
-	def buildRegionData(self):
-		self.regionRects = {}
-		settings = self.getContinentSettings()
-		iIslandsGrain = 4 + self.map.getCustomMapOption(1)
-		tinyIslandOverlap = 0
-		iRegionCount = 2 + self.map.getCustomMapOption(2)
-		vSplitPrimary, vSplitSecondary, vSplitTertiary, tripleSplit = THemContinentRegionBuilder.getSplitSettings(iRegionCount)
-		region_data = []
-
-		if tinyIslandOverlap:
-			region_data.append(("islands", "overlap islands", 4, 6, 0, 0, self.iW, self.iH, iIslandsGrain))
-
-		self.addContinentRegions(region_data, "primary", vSplitPrimary, tripleSplit, settings, iIslandsGrain, tinyIslandOverlap)
-		self.addContinentRegions(region_data, "secondary", vSplitSecondary, tripleSplit, settings, iIslandsGrain, tinyIslandOverlap)
-		if tripleSplit:
-			self.addContinentRegions(region_data, "tertiary", vSplitTertiary, tripleSplit, settings, iIslandsGrain, tinyIslandOverlap)
-
-		return region_data
-
-	def copyRegionRects(self):
-		rectsCopy = {}
-		for label in self.regionRects.keys():
-			rectsCopy[label] = []
-			for rect in self.regionRects[label]:
-				rectsCopy[label].append(rect)
-		return rectsCopy
-
-	def countRegionLand(self, plotTypes):
+class THem_ContinentBalancer:
+	def countRegionLand(self, plotTypes, regionRects, iW, iH):
 		counts = {}
-		for label in self.regionRects.keys():
+		for label in regionRects.keys():
 			iCount = 0
-			for rect in self.regionRects[label]:
-				iWestX, iSouthY, iWidth, iHeight = rect
+			regionMasks = regionRects[label]
+			for regionMask in regionMasks:
+				iWestX, iSouthY, iWidth, iHeight = regionMaskManager.getRegionMaskBounds(regionMask, iW, iH)
 				for x in range(iWestX, iWestX + iWidth):
 					for y in range(iSouthY, iSouthY + iHeight):
-						i = y * self.iW + x
+						if not regionMaskManager.plotInRegionMask(regionMask, x, y, iW, iH): continue
+						i = y * iW + x
 						if plotTypes[i] != PlotTypes.PLOT_OCEAN:
 							iCount += 1
 			counts[label] = iCount
@@ -518,7 +519,6 @@ class THemContinentRegionBuilder:
 		iRegions = len(labels)
 		for label in labels:
 			iScaled = counts[label] * iRegions * 100
-			# +/- 3%
 			if iScaled < iTotal * 97:
 				return False
 			if iScaled > iTotal * 103:
@@ -536,35 +536,175 @@ class THemContinentRegionBuilder:
 		for label in labels:
 			print "  %s land: %d" % (label, counts[label])
 
+def _remove_one_tile_lakes(plotTypes, iW, iH):
+	if plotTypes is None:
+		return None
+
+	lakePlots = []
+	directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+	bWrapX = getWrapX()
+	bWrapY = getWrapY()
+
+	for x in range(iW):
+		for y in range(iH):
+			i = y * iW + x
+			if plotTypes[i] != PlotTypes.PLOT_OCEAN: continue
+
+			bAdjacentWater = False
+			for dx, dy in directions:
+				adjX = x + dx
+				adjY = y + dy
+				if bWrapX:
+					if adjX < 0: adjX = iW - 1
+					elif adjX >= iW: adjX = 0
+				if bWrapY:
+					if adjY < 0: adjY = iH - 1
+					elif adjY >= iH: adjY = 0
+				if adjX < 0 or adjX >= iW: continue
+				if adjY < 0 or adjY >= iH: continue
+				if plotTypes[adjY * iW + adjX] == PlotTypes.PLOT_OCEAN:
+					bAdjacentWater = True
+					break
+
+			if not bAdjacentWater:
+				lakePlots.append(i)
+
+	for i in lakePlots:
+		plotTypes[i] = PlotTypes.PLOT_LAND
+
+	if len(lakePlots) > 0:
+		print "THem converted %d one-tile lakes to flatland" % len(lakePlots)
+
+	return plotTypes
+
 def generatePlotTypes():
 	global _THEM_REGION_RECTS
+	global _START_PLOT_MAP
+	global plotgen
 
-	print "THem generatePlotTypes entered"
-	NiTextOut("Setting Plot Types (Python Custom Continents) ...")
+	print "THem GMF generatePlotTypes entered"
+	NiTextOut("Setting Plot Types (Python Geometric Continents) ...")
+	_START_PLOT_MAP = None
+	
 	gc = CyGlobalContext()
 	map = CyMap()
+	iW = map.getGridWidth()
+	iH = map.getGridHeight()
+	continent_grain = map.getCustomMapOption(2)
+	continent_count = map.getCustomMapOption(1)
+	bPeripheralReduce = (map.getCustomMapOption(3) == 1)
+	iContinentAngle = gc.getGame().getMapRand().get(51, "THem Continent Angle") - 25
+	print "THem continent angle:", iContinentAngle
+
+	sizekey = map.getWorldSize()
+	sizevalues = {
+		WorldSizeTypes.WORLDSIZE_DUEL:      (3,2,1),
+		WorldSizeTypes.WORLDSIZE_TINY:      (3,2,1),
+		WorldSizeTypes.WORLDSIZE_SMALL:     (4,2,1),
+		WorldSizeTypes.WORLDSIZE_STANDARD:  (4,2,1),
+		WorldSizeTypes.WORLDSIZE_LARGE:     (4,2,1),
+		WorldSizeTypes.WORLDSIZE_HUGE:      (5,2,1)
+	}
+	(ScatterGrain, BalanceGrain, GatherGrain) = sizevalues[sizekey]
+	if continent_grain == 0:
+		PeripheralGrain = 1
+	else:
+		PeripheralGrain = continent_grain + 2
+	CoreGrain = continent_grain + 1
+	
+	iRawSeaLevelChange = gc.getSeaLevelInfo(map.getSeaLevel()).getSeaLevelChange()
+	fPeripheralSizeChange = 0.0
+	iWaterPercentChange = 0
+	if iRawSeaLevelChange > 0:
+		fPeripheralSizeChange = 0.06
+		iWaterPercentChange = -10
+	elif iRawSeaLevelChange < 0:
+		fPeripheralSizeChange = -0.08
+	
+	regions =[]
+	additional_regions = []
+	
+	if continent_count == 0:
+		regions = [
+			# Required: Name, Type, Center X, Center Y, Width, Height, Angle, Terrain, Grain, Hills Grain, Water Percent, bReduceEdges
+			("PeripheralL", "Rect", 0.250, 0.45, 0.30+fPeripheralSizeChange, 0.70+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain+1, 50+iWaterPercentChange, bPeripheralReduce),
+			("PeripheralR", "Rect", 0.750, 0.55, 0.30+fPeripheralSizeChange, 0.70+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain+1, 50+iWaterPercentChange, bPeripheralReduce),
+			("IslandsR", "Rect", 0.750, 0.15, 0.40, 0.2, 0, "default", ScatterGrain, ScatterGrain, 85, False),
+			("IslandsL", "Rect", 0.250, 0.85, 0.40, 0.2, 0, "default", ScatterGrain, ScatterGrain, 85, False),
+		]
+		region_data = [
+			("ColumnL", 0.250, 0.450, 0.30+fPeripheralSizeChange, 0.70+fPeripheralSizeChange, iContinentAngle),
+			("ColumnR", 0.750, 0.550, 0.30+fPeripheralSizeChange, 0.70+fPeripheralSizeChange, iContinentAngle),
+		]
+		if continent_grain == 0:
+			additional_regions =[
+				("CoreL", "Ellipse", 0.250, 0.45, 0.15, 0.5, iContinentAngle, "default", CoreGrain, ScatterGrain, 25, True),
+				("CoreR", "Ellipse", 0.750, 0.55, 0.150, 0.5, iContinentAngle, "default", CoreGrain, ScatterGrain, 25, True),
+			]
+		else: # smaller core for higher grain continents
+			additional_regions =[
+				("CoreL", "Ellipse", 0.250, 0.45, 0.07, 0.25, iContinentAngle, "flat", CoreGrain, ScatterGrain, 25, True),
+				("CoreR", "Ellipse", 0.750, 0.55, 0.07, 0.25, iContinentAngle, "flat", CoreGrain, ScatterGrain, 25, True),
+			]
+	else:
+		regions = [
+			("PeripheralL", "Rect", 0.167, 0.450, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain, 40+iWaterPercentChange, bPeripheralReduce),
+			("PeripheralR", "Rect", 0.833, 0.550, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain, 40+iWaterPercentChange, bPeripheralReduce),
+			("PeripheralC", "Rect", 0.500, 0.500, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain, 40+iWaterPercentChange, bPeripheralReduce),
+			
+			("IslandsR", "Rect", 0.833, 0.180, 0.150, 0.150, 0, "default", ScatterGrain, ScatterGrain, 85, False),
+			("IslandsL", "Rect", 0.167, 0.85, 0.150, 0.150, 0, "default", ScatterGrain, ScatterGrain, 85, False),
+			("IslandsC_Top", "Rect", 0.500, 0.900, 0.150, 0.075, 0, "default", ScatterGrain, ScatterGrain, 90, False),
+			("IslandsC_Bot", "Rect", 0.500, 0.100, 0.150, 0.075, 0, "default", ScatterGrain, ScatterGrain, 90, False),
+		]
+		if continent_grain == 0:
+			additional_regions =[
+				("CoreL", "Ellipse", 0.167, 0.450, 0.100, 0.55, iContinentAngle, "default", GatherGrain, ScatterGrain, 25, True),
+				("CoreR", "Ellipse", 0.833, 0.550, 0.100, 0.55, iContinentAngle, "default", GatherGrain, ScatterGrain, 25, True),
+				("CoreC", "Ellipse", 0.500, 0.500, 0.100, 0.55, iContinentAngle, "default", GatherGrain, ScatterGrain, 25, True),
+			]
+		else: # smaller core for higher grain continents
+			additional_regions =[
+				("CoreL", "Ellipse", 0.167, 0.450, 0.050, 0.23, iContinentAngle, "default", GatherGrain, ScatterGrain, 25, True),
+				("CoreR", "Ellipse", 0.833, 0.550, 0.050, 0.23, iContinentAngle, "default", GatherGrain, ScatterGrain, 25, True),
+				("CoreC", "Ellipse", 0.500, 0.500, 0.050, 0.23, iContinentAngle, "default", GatherGrain, ScatterGrain, 25, True),
+			]
+		region_data = [
+			("ColumnL", 0.167, 0.450, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle),
+			("ColumnR", 0.833, 0.550, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle),
+			("ColumnC", 0.500, 0.500, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle),
+		]
+
+	regions.extend(additional_regions)
+
+	regionRects = {}
+	for data in region_data:
+		label, centerX, centerY, width, height, angle = data
+		regionRects[label] = [regionMaskManager.makeRegionMask(centerX, centerY, width, height, angle, iW, iH)]
+
 	iMaxAttempts = 20
 	bestPlotTypes = None
 	bestRects = None
 	iBestScore = -1
+	continentBalancer = THem_ContinentBalancer()
 
 	for iAttempt in range(1, iMaxAttempts + 1):
-		builder = THemContinentRegionBuilder(map, gc)
-		region_data = builder.buildRegionData()
-		fractal_world = THemMultilayeredFractal()
-		plotTypes = fractal_world.generatePlotsByRegion(region_data)
-		counts = builder.countRegionLand(plotTypes)
-		bAccepted = builder.isLandBalanceAcceptable(counts)
-		builder.printLandBalance(iAttempt, counts, bAccepted)
+		plotgen = GeometricMultiFractal()
+		plotTypes = plotgen.generatePlotsByRegion(regions)
+		if continent_grain < 2: # Less than Fjord
+			plotTypes = _remove_one_tile_lakes(plotTypes, iW, iH)
+		counts = continentBalancer.countRegionLand(plotTypes, regionRects, iW, iH)
+		bAccepted = continentBalancer.isLandBalanceAcceptable(counts)
+		continentBalancer.printLandBalance(iAttempt, counts, bAccepted)
 		if bAccepted:
-			_THEM_REGION_RECTS = builder.copyRegionRects()
+			_THEM_REGION_RECTS = regionRects
 			return plotTypes
 
-		iScore = builder.getLandBalanceScore(counts)
+		iScore = continentBalancer.getLandBalanceScore(counts)
 		if iBestScore == -1 or iScore < iBestScore:
 			iBestScore = iScore
 			bestPlotTypes = plotTypes
-			bestRects = builder.copyRegionRects()
+			bestRects = regionRects
 
 	if bestRects != None:
 		_THEM_REGION_RECTS = bestRects
@@ -575,12 +715,15 @@ def _get_dominant_area_for_region(label, usedAreas):
 	global _THEM_REGION_RECTS
 
 	map = CyMap()
+	iW = map.getGridWidth()
+	iH = map.getGridHeight()
 	areaCounts = {}
-	rects = _THEM_REGION_RECTS.get(label, [])
-	for rect in rects:
-		iWestX, iSouthY, iWidth, iHeight = rect
+	regionMasks = _THEM_REGION_RECTS.get(label, [])
+	for regionMask in regionMasks:
+		iWestX, iSouthY, iWidth, iHeight = regionMaskManager.getRegionMaskBounds(regionMask, iW, iH)
 		for x in range(iWestX, iWestX + iWidth):
 			for y in range(iSouthY, iSouthY + iHeight):
+				if not regionMaskManager.plotInRegionMask(regionMask, x, y, iW, iH): continue
 				pPlot = map.plot(x, y)
 				if pPlot.isWater() or pPlot.isPeak(): continue
 				iArea = pPlot.getArea()
@@ -631,8 +774,8 @@ def _resolve_team_areas():
 def _get_team_region_bounds(label, iW, iH):
 	global _THEM_REGION_RECTS
 
-	rects = _THEM_REGION_RECTS.get(label, [])
-	if len(rects) == 0:
+	regionMasks = _THEM_REGION_RECTS.get(label, [])
+	if len(regionMasks) == 0:
 		return (0, iW - 1, 0, iH - 1)
 
 	xMin = iW - 1
@@ -640,8 +783,8 @@ def _get_team_region_bounds(label, iW, iH):
 	yMin = iH - 1
 	yMax = 0
 
-	for rect in rects:
-		iWestX, iSouthY, iWidth, iHeight = rect
+	for regionMask in regionMasks:
+		iWestX, iSouthY, iWidth, iHeight = regionMaskManager.getRegionMaskBounds(regionMask, iW, iH)
 		iEastX = iWestX + iWidth - 1
 		iNorthY = iSouthY + iHeight - 1
 		if iWestX < xMin: xMin = iWestX
@@ -656,6 +799,63 @@ def _get_team_region_bounds(label, iW, iH):
 
 	return (xMin, xMax, yMin, yMax)
 
+class THem_StartPlotManager:
+	def countAdjacentWaterTiles(self, map, x, y, iW, iH):
+		iWaterCount = 0
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				if dx == 0 and dy == 0: continue
+				adjX = x + dx
+				adjY = y + dy
+				if getWrapX():
+					if adjX < 0: adjX = iW - 1
+					elif adjX >= iW: adjX = 0
+				if getWrapY():
+					if adjY < 0: adjY = iH - 1
+					elif adjY >= iH: adjY = 0
+				if adjX < 0 or adjX >= iW: continue
+				if adjY < 0 or adjY >= iH: continue
+				if map.plot(adjX, adjY).isWater():
+					iWaterCount += 1
+		return iWaterCount
+
+	def isStartTooCoastal(self, map, x, y, iW, iH, playerID, context):
+		iWaterCount = self.countAdjacentWaterTiles(map, x, y, iW, iH)
+		if iWaterCount >= 3:
+			print "THem rejected %s start for player %d at (%d, %d): %d adjacent water tiles" % (context, playerID, x, y, iWaterCount)
+			return True
+		return False
+
+	def isStartLandmassTooSmall(self, map, pPlot, playerID, context):
+		iArea = pPlot.getArea()
+		if iArea == -1:
+			print "THem rejected %s start for player %d at (%d, %d): no land area" % (context, playerID, pPlot.getX(), pPlot.getY())
+			return True
+
+		pArea = map.getArea(iArea)
+		if pArea.isNone():
+			print "THem rejected %s start for player %d at (%d, %d): no land area" % (context, playerID, pPlot.getX(), pPlot.getY())
+			return True
+
+		iAreaTiles = pArea.getNumTiles()
+		if iAreaTiles < 20:
+			print "THem rejected %s start for player %d at (%d, %d): landmass has %d tiles" % (context, playerID, pPlot.getX(), pPlot.getY(), iAreaTiles)
+			return True
+
+		return False
+
+	def isValidStartPlot(self, map, pPlot, playerID, context):
+		if pPlot.isWater() or pPlot.isPeak(): return False
+		if self.isStartTooCoastal(map, pPlot.getX(), pPlot.getY(), map.getGridWidth(), map.getGridHeight(), playerID, context): return False
+		if self.isStartLandmassTooSmall(map, pPlot, playerID, context): return False
+		return True
+
+def _is_valid_default_start_plot(playerID, x, y):
+	map = CyMap()
+	pPlot = map.plot(x, y)
+	startManager = THem_StartPlotManager()
+	return startManager.isValidStartPlot(map, pPlot, playerID, "default")
+
 def _assign_all_starting_plots():
 	global bTeamPlacement
 	global teamRegionMap
@@ -664,6 +864,7 @@ def _assign_all_starting_plots():
 	gc = CyGlobalContext()
 	map = CyMap()
 	mapRand = gc.getGame().getMapRand()
+	startManager = THem_StartPlotManager()
 	iW = map.getGridWidth()
 	iH = map.getGridHeight()
 
@@ -694,6 +895,7 @@ def _assign_all_starting_plots():
 		numInTeam = len(teamPlayers)
 		iTargetArea = teamAreaMap[iTeam]
 		label = teamRegionMap.get(iTeam, "")
+		teamMasks = _THEM_REGION_RECTS.get(label, [])
 		(teamXMin, teamXMax, teamYMin, teamYMax) = _get_team_region_bounds(label, iW, iH)
 
 		sliceOrder = []
@@ -755,8 +957,9 @@ def _assign_all_starting_plots():
 
 					for x in range(searchXMin, searchXMax + 1):
 						for y in range(searchYMin, searchYMax + 1):
+							if not regionMaskManager.plotInRegionMasks(teamMasks, x, y, iW, iH): continue
 							pPlot = map.plot(x, y)
-							if pPlot.isWater() or pPlot.isPeak(): continue
+							if not startManager.isValidStartPlot(map, pPlot, playerID, "team candidate"): continue
 							if pPlot.getArea() != iTargetArea: continue
 
 							tooClose = False
@@ -785,8 +988,9 @@ def _assign_all_starting_plots():
 			if not plotAssigned:
 				for x in range(fullXMin, fullXMax + 1):
 					for y in range(fullYMin, fullYMax + 1):
+						if not regionMaskManager.plotInRegionMasks(teamMasks, x, y, iW, iH): continue
 						pPlot = map.plot(x, y)
-						if pPlot.isWater() or pPlot.isPeak(): continue
+						if not startManager.isValidStartPlot(map, pPlot, playerID, "team fallback"): continue
 						if pPlot.getArea() != iTargetArea: continue
 						tooClose = False
 						for (ax, ay) in assigned_plots:
@@ -813,14 +1017,24 @@ def findStartingPlot(argsList):
 
 	playerID = argsList[0]
 	if not bTeamPlacement:
-		return -1
+		return CvMapGeneratorUtil.findStartingPlot(playerID, _is_valid_default_start_plot)
 
 	if _START_PLOT_MAP is None:
 		_START_PLOT_MAP = _assign_all_starting_plots()
 		if _START_PLOT_MAP is None:
-			return -1
+			return CvMapGeneratorUtil.findStartingPlot(playerID, _is_valid_default_start_plot)
 
-	return _START_PLOT_MAP.get(playerID, -1)
+	iPlot = _START_PLOT_MAP.get(playerID, -1)
+	if iPlot == -1:
+		return CvMapGeneratorUtil.findStartingPlot(playerID, _is_valid_default_start_plot)
+
+	map = CyMap()
+	pPlot = map.plotByIndex(iPlot)
+	startManager = THem_StartPlotManager()
+	if not startManager.isValidStartPlot(map, pPlot, playerID, "final"):
+		return CvMapGeneratorUtil.findStartingPlot(playerID, _is_valid_default_start_plot)
+
+	return iPlot
 
 def normalizeStartingPlotLocations():
 	global bTeamPlacement
@@ -831,19 +1045,16 @@ def normalizeStartingPlotLocations():
 	CyPythonMgr().allowDefaultImpl()
 	return None
 
+def normalizeAddLakes():
+	return None
+
 def getTHemLatitude(iX, iY):
 	map = CyMap()
-	iTiltOption = map.getCustomMapOption(4)
-	iW = map.getGridWidth()
 	iH = map.getGridHeight()
 
-	if iW <= 1: iW = 2
 	if iH <= 1: iH = 2
 
-	if iTiltOption == 1:
-		lat = abs((iW / 2) - iX) / float(iW / 2)
-	else:
-		lat = abs((iH / 2) - iY) / float(iH / 2)
+	lat = abs((iH / 2) - iY) / float(iH / 2)
 
 	if lat < 0:
 		lat = 0.0
@@ -978,17 +1189,18 @@ class ResourceManager:
 			return plots
 
 		label = teamRegionMap[iTeam]
-		rects = _THEM_REGION_RECTS.get(label, [])
+		regionMasks = _THEM_REGION_RECTS.get(label, [])
 		iArea = -1
 		if teamAreaMap.has_key(iTeam):
 			iArea = teamAreaMap[iTeam]
 
-		for rect in rects:
-			iWestX, iSouthY, iWidth, iHeight = rect
+		for regionMask in regionMasks:
+			iWestX, iSouthY, iWidth, iHeight = regionMaskManager.getRegionMaskBounds(regionMask, self.iW, self.iH)
 			for x in range(iWestX, iWestX + iWidth):
 				for y in range(iSouthY, iSouthY + iHeight):
 					if x < 0 or x >= self.iW: continue
 					if y < 0 or y >= self.iH: continue
+					if not regionMaskManager.plotInRegionMask(regionMask, x, y, self.iW, self.iH): continue
 					pPlot = self.map.plot(x, y)
 					if pPlot.isNone(): continue
 					if iArea != -1 and not pPlot.isWater():
@@ -1297,6 +1509,64 @@ class ResourceManager:
 
 				if placed < iCopies:
 					print "THem radius placed only %d of %d copies for player %d" % (placed, iCopies, pid)
+
+	def ensure_bonus_per_grid(self, bonusNames, iGridSize):
+		if iGridSize <= 0:
+			return
+
+		bonusIDs = self._bonus_ids_from_names(bonusNames)
+		bonusLookup = {}
+		for iBonus in bonusIDs:
+			bonusLookup[iBonus] = 1
+
+		startLookup = self._start_plot_lookup()
+		iBlocksChecked = 0
+		iBlocksSatisfied = 0
+		iPlaced = 0
+		iBlocked = 0
+
+		for xMin in range(0, self.iW, iGridSize):
+			for yMin in range(0, self.iH, iGridSize):
+				iBlocksChecked += 1
+				xMax = xMin + iGridSize
+				yMax = yMin + iGridSize
+				if xMax > self.iW: xMax = self.iW
+				if yMax > self.iH: yMax = self.iH
+
+				iExisting = 0
+				plots = []
+				for x in range(xMin, xMax):
+					for y in range(yMin, yMax):
+						pPlot = self.map.plot(x, y)
+						if bonusLookup.has_key(pPlot.getBonusType(-1)):
+							iExisting += 1
+						plots.append(pPlot)
+
+				if iExisting > 0:
+					iBlocksSatisfied += 1
+					continue
+
+				plots = self._shuffle_list(plots, "THem Map Food Plot Shuffle")
+				shuffledBonusIDs = self._shuffle_list(bonusIDs, "THem Map Food Bonus Shuffle")
+				bPlaced = False
+				for pPlot in plots:
+					if pPlot.getBonusType(-1) != -1: continue
+					if pPlot.isWater() or pPlot.isPeak(): continue
+					if self._is_player_start_plot(pPlot, startLookup): continue
+					for iBonus in shuffledBonusIDs:
+						if pPlot.canHaveBonus(iBonus, True):
+							pPlot.setBonusType(iBonus)
+							self._debug_sign(pPlot, "THem map food " + self._bonus_name_from_id(iBonus))
+							iPlaced += 1
+							bPlaced = True
+							break
+					if bPlaced:
+						break
+
+				if not bPlaced:
+					iBlocked += 1
+
+		print "THem map food scan: checked %d blocks, satisfied %d, placed %d, blocked %d" % (iBlocksChecked, iBlocksSatisfied, iPlaced, iBlocked)
 
 	def place_food_bonus_in_BFC(self, bonusNames, iTargetCount, bCheckExisting):
 		if iTargetCount <= 0:
@@ -1635,9 +1905,18 @@ def normalizeAddExtras():
 	map.recalculateAreas()
 	rm = ResourceManager(map, gc, dice)
 
-	iTeamerBalancingOption = map.getCustomMapOption(5)
-	iStartFoodOption = map.getCustomMapOption(7)
+	iTeamerBalancingOption = map.getCustomMapOption(4)
+	iMapFoodOption = map.getCustomMapOption(5)
+	iStartFoodOption = map.getCustomMapOption(6)
 	bCustomBalancing = False
+	LandFoodBonus = ["BONUS_WHEAT", "BONUS_RICE", "BONUS_CORN", "BONUS_COW", "BONUS_SHEEP", "BONUS_PIG", "BONUS_DEER", "BONUS_BANANA"]
+	StartLandFoodBonus = ["BONUS_WHEAT", "BONUS_RICE", "BONUS_CORN", "BONUS_COW", "BONUS_SHEEP", "BONUS_PIG"]
+	Strategics = ["BONUS_IRON", "BONUS_COPPER", "BONUS_HORSE","BONUS_COAL", "BONUS_URANIUM", "BONUS_ALUMINUM", "BONUS_OIL"]
+	SemiStrategics = ["BONUS_IVORY", "BONUS_STONE", "BONUS_MARBLE"]
+	PreciousMetals = ["BONUS_GOLD", "BONUS_SILVER", "BONUS_GEMS"]
+	EarlyHappiness = ["BONUS_FUR", "BONUS_WINE"]
+	CalendarBonus = ["BONUS_SPICES", "BONUS_SUGAR", "BONUS_DYE", "BONUS_INCENSE", "BONUS_SILK"]
+	WaterBonus = ["BONUS_FISH", "BONUS_CRAB", "BONUS_CRAB", "BONUS_WHALE"]
 
 	if bTeamPlacement and iTeamerBalancingOption == 1:
 		if _resolve_team_areas():
@@ -1645,16 +1924,8 @@ def normalizeAddExtras():
 
 	if bCustomBalancing:
 		print "PY: Teamer balancing regional resource groups..."
-
-		Strategics = ["BONUS_IRON", "BONUS_COPPER", "BONUS_HORSE"]
-		SemiStrategics = ["BONUS_IVORY", "BONUS_STONE", "BONUS_MARBLE"]
-		PreciousMetals = ["BONUS_GOLD", "BONUS_SILVER", "BONUS_GEMS"]
-		EarlyHappiness = ["BONUS_FUR", "BONUS_WINE"]
-		CalendarBonus = ["BONUS_SPICES", "BONUS_SUGAR", "BONUS_BANANA", "BONUS_DYE", "BONUS_INCENSE", "BONUS_SILK"]
-		WaterBonus = ["BONUS_FISH", "BONUS_CRAB", "BONUS_CRAB", "BONUS_WHALE"]
-
 		rm.swap_resources("BONUS_IVORY", None)
-		rm.place_bonus_in_radius(Strategics, 3, 1, 5)
+		rm.place_bonus_in_radius(Strategics, 7, 1, 5)
 
 		sortedTeams = teamRegionMap.keys()
 		sortedTeams.sort()
@@ -1664,15 +1935,15 @@ def normalizeAddExtras():
 			iRoundedUp = int(0.5 * iPlayerCount + 1)
 			if iRoundedDown < 1: iRoundedDown = 1
 
-			rm.place_balanced_team_resource(iTeam, CalendarBonus, 4, iRoundedDown)
+			rm.place_balanced_team_resource(iTeam, CalendarBonus, 4, iRoundedUp)
 			rm.place_balanced_team_resource(iTeam, PreciousMetals, 3, iRoundedUp)
-			rm.place_balanced_team_resource(iTeam, EarlyHappiness, 2, iRoundedUp)
+			rm.place_balanced_team_resource(iTeam, EarlyHappiness, 2, iPlayerCount)
 			rm.place_balanced_team_resource(iTeam, SemiStrategics, 3, iRoundedDown, True, 4)
-
+	else: # Default placer
+		CyPythonMgr().allowDefaultImpl()
+	if iMapFoodOption != 0:
+		print "PY: Teamer ensuring mapwide land food bonuses..."
+		rm.ensure_bonus_per_grid(LandFoodBonus, iMapFoodOption+3)
 	if iStartFoodOption > 0:
 		print "PY: Teamer adding starting plot food bonuses..."
-		FoodBonus = ["BONUS_WHEAT", "BONUS_RICE", "BONUS_CORN", "BONUS_COW", "BONUS_SHEEP", "BONUS_PIG", "BONUS_DEER"]
-		rm.place_food_bonus_in_BFC(FoodBonus, iStartFoodOption, True)
-
-	if not bCustomBalancing:
-		CyPythonMgr().allowDefaultImpl()
+		rm.place_food_bonus_in_BFC(StartLandFoodBonus, iStartFoodOption, True)
