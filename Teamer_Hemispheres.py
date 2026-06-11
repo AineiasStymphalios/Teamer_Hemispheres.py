@@ -233,10 +233,10 @@ class GeometricMultiFractal(CvMapGeneratorUtil.MultilayeredFractal):
 		# Define Terrain Profiles: (HillDensity%, PeakDensity%_of_Hills)
 		terrain_profiles = {
 			"flat":         (15, 1),
+			"default":      (30, 20),
 			"plateau":      (50, 30),
 			"highland":     (75, 40),
 			"alpine":       (95, 60),
-			"default":      (30, 20)
 		}
 		
 		gc = CyGlobalContext()
@@ -615,11 +615,11 @@ def generatePlotTypes():
 	iRawSeaLevelChange = gc.getSeaLevelInfo(map.getSeaLevel()).getSeaLevelChange()
 	fPeripheralSizeChange = 0.0
 	iWaterPercentChange = 0
-	if iRawSeaLevelChange > 0:
-		fPeripheralSizeChange = 0.06
-		iWaterPercentChange = -10
-	elif iRawSeaLevelChange < 0:
-		fPeripheralSizeChange = -0.08
+	if iRawSeaLevelChange > 0: # High
+		fPeripheralSizeChange = -0.06
+		iWaterPercentChange = 10
+	elif iRawSeaLevelChange < 0: # Low
+		fPeripheralSizeChange = +0.06
 	
 	regions =[]
 	additional_regions = []
@@ -629,8 +629,8 @@ def generatePlotTypes():
 			# Required: Name, Type, Center X, Center Y, Width, Height, Angle, Terrain, Grain, Hills Grain, Water Percent, bReduceEdges
 			("PeripheralL", "Rect", 0.250, 0.45, 0.30+fPeripheralSizeChange, 0.70+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain+1, 50+iWaterPercentChange, bPeripheralReduce),
 			("PeripheralR", "Rect", 0.750, 0.55, 0.30+fPeripheralSizeChange, 0.70+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain+1, 50+iWaterPercentChange, bPeripheralReduce),
-			("IslandsR", "Rect", 0.750, 0.15, 0.40, 0.2, 0, "default", ScatterGrain, ScatterGrain, 85, False),
-			("IslandsL", "Rect", 0.250, 0.85, 0.40, 0.2, 0, "default", ScatterGrain, ScatterGrain, 85, False),
+			("IslandsR", "Rect", 0.750, 0.18, 0.3, 0.2, 0, "default", ScatterGrain, ScatterGrain, 85, False),
+			("IslandsL", "Rect", 0.250, 0.82, 0.3, 0.2, 0, "default", ScatterGrain, ScatterGrain, 85, False),
 		]
 		region_data = [
 			("ColumnL", 0.250, 0.450, 0.30+fPeripheralSizeChange, 0.70+fPeripheralSizeChange, iContinentAngle),
@@ -646,22 +646,22 @@ def generatePlotTypes():
 				("CoreL", "Ellipse", 0.250, 0.45, 0.07, 0.25, iContinentAngle, "flat", CoreGrain, ScatterGrain, 25, True),
 				("CoreR", "Ellipse", 0.750, 0.55, 0.07, 0.25, iContinentAngle, "flat", CoreGrain, ScatterGrain, 25, True),
 			]
-	else:
+	else: # 3 continents
 		regions = [
 			("PeripheralL", "Rect", 0.167, 0.450, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain, 40+iWaterPercentChange, bPeripheralReduce),
 			("PeripheralR", "Rect", 0.833, 0.550, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain, 40+iWaterPercentChange, bPeripheralReduce),
 			("PeripheralC", "Rect", 0.500, 0.500, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain, 40+iWaterPercentChange, bPeripheralReduce),
 			
-			("IslandsR", "Rect", 0.833, 0.180, 0.150, 0.150, 0, "default", ScatterGrain, ScatterGrain, 85, False),
-			("IslandsL", "Rect", 0.167, 0.85, 0.150, 0.150, 0, "default", ScatterGrain, ScatterGrain, 85, False),
-			("IslandsC_Top", "Rect", 0.500, 0.900, 0.150, 0.075, 0, "default", ScatterGrain, ScatterGrain, 90, False),
-			("IslandsC_Bot", "Rect", 0.500, 0.100, 0.150, 0.075, 0, "default", ScatterGrain, ScatterGrain, 90, False),
+			("IslandsR", "Rect", 0.833, 0.180, 0.10, 0.150, 0, "default", ScatterGrain, ScatterGrain, 85, False),
+			("IslandsL", "Rect", 0.167, 0.85, 0.10, 0.150, 0, "default", ScatterGrain, ScatterGrain, 85, False),
+			("IslandsC_Top", "Rect", 0.500, 0.900, 0.10, 0.075, 0, "default", ScatterGrain, ScatterGrain, 90, False),
+			("IslandsC_Bot", "Rect", 0.500, 0.100, 0.10, 0.075, 0, "default", ScatterGrain, ScatterGrain, 90, False),
 		]
 		if continent_grain == 0:
 			additional_regions =[
-				("CoreL", "Ellipse", 0.167, 0.450, 0.100, 0.55, iContinentAngle, "default", GatherGrain, ScatterGrain, 25, True),
-				("CoreR", "Ellipse", 0.833, 0.550, 0.100, 0.55, iContinentAngle, "default", GatherGrain, ScatterGrain, 25, True),
-				("CoreC", "Ellipse", 0.500, 0.500, 0.100, 0.55, iContinentAngle, "default", GatherGrain, ScatterGrain, 25, True),
+				("CoreL", "Ellipse", 0.167, 0.450, 0.12, 0.55, iContinentAngle, "default", GatherGrain, ScatterGrain, 25, True),
+				("CoreR", "Ellipse", 0.833, 0.550, 0.12, 0.55, iContinentAngle, "default", GatherGrain, ScatterGrain, 25, True),
+				("CoreC", "Ellipse", 0.500, 0.500, 0.12, 0.55, iContinentAngle, "default", GatherGrain, ScatterGrain, 25, True),
 			]
 		else: # smaller core for higher grain continents
 			additional_regions =[
@@ -691,8 +691,8 @@ def generatePlotTypes():
 	for iAttempt in range(1, iMaxAttempts + 1):
 		plotgen = GeometricMultiFractal()
 		plotTypes = plotgen.generatePlotsByRegion(regions)
-		if continent_grain < 2: # Less than Fjord
-			plotTypes = _remove_one_tile_lakes(plotTypes, iW, iH)
+		# if continent_grain < 2: # Less than Fjord
+			# plotTypes = _remove_one_tile_lakes(plotTypes, iW, iH)
 		counts = continentBalancer.countRegionLand(plotTypes, regionRects, iW, iH)
 		bAccepted = continentBalancer.isLandBalanceAcceptable(counts)
 		continentBalancer.printLandBalance(iAttempt, counts, bAccepted)
@@ -1045,9 +1045,6 @@ def normalizeStartingPlotLocations():
 	CyPythonMgr().allowDefaultImpl()
 	return None
 
-def normalizeAddLakes():
-	return None
-
 def getTHemLatitude(iX, iY):
 	map = CyMap()
 	iH = map.getGridHeight()
@@ -1092,6 +1089,383 @@ def addFeatures():
 	featuregen = THemFeatureGenerator()
 	featuregen.addFeatures()
 	return 0
+
+class PathNavigator:
+	def __init__(self, map_obj, dice):
+		self.map = map_obj
+		self.dice = dice
+		self.iW = map_obj.getGridWidth()
+		self.iH = map_obj.getGridHeight()
+		self.noise = CyFractal()
+		self.noise.fracInit(self.iW, self.iH, 2, self.dice, 0, -1, -1)
+
+	def is_any_water(self, x, y):
+		if x < 0 or x >= self.iW or y < 0 or y >= self.iH: return False
+		return self.map.plot(x, y).isWater()
+
+	def get_best_move(self, cx, cy, tx, ty, visited, meander):
+		best_score = 999999.0
+		best_move = None
+		moves = [(1,0), (-1,0), (0,1), (0,-1), (1,1), (1,-1), (-1,1), (-1,-1)]
+
+		for move in moves:
+			nx = cx + move[0]
+			ny = cy + move[1]
+			if nx < 0 or nx >= self.iW or ny < 0 or ny >= self.iH: continue
+
+			bVisited = False
+			for v in visited:
+				if nx == v[0] and ny == v[1]:
+					bVisited = True
+					break
+			if bVisited: continue
+
+			dist = math.sqrt((nx - tx)**2 + (ny - ty)**2)
+			n_val = (self.noise.getHeight(nx, ny) / 100.0) - 0.5
+			score = dist * (1.0 + (n_val * meander))
+
+			if score < best_score:
+				best_score = score
+				best_move = (nx, ny, move[0], move[1])
+
+		return best_move
+
+	def generate_path(self, start, end, meander):
+		curr_x, curr_y = start
+		path = [(curr_x, curr_y)]
+		visited = [(curr_x, curr_y)]
+
+		max_steps = (abs(curr_x - end[0]) + abs(curr_y - end[1])) * 4
+		for i in range(max_steps):
+			if curr_x == end[0] and curr_y == end[1]: break
+			move = self.get_best_move(curr_x, curr_y, end[0], end[1], visited, meander)
+			if not move: break
+			curr_x = move[0]
+			curr_y = move[1]
+			path.append((curr_x, curr_y))
+			visited.append((curr_x, curr_y))
+
+			if i > 0:
+				if self.is_any_water(curr_x, curr_y):
+					break
+
+		return path
+
+class StandardRiverMaker:
+	def __init__(self, navigator):
+		self.nav = navigator
+		self.map = navigator.map
+
+	def build(self, checkpoints, meander):
+		riverID = self.map.getNextRiverID()
+		self.map.incrementNextRiverID()
+		for i in range(len(checkpoints) - 1):
+			start = (int(self.nav.iW * checkpoints[i][0]), int(self.nav.iH * checkpoints[i][1]))
+			end = (int(self.nav.iW * checkpoints[i+1][0]), int(self.nav.iH * checkpoints[i+1][1]))
+			path = self.nav.generate_path(start, end, meander)
+			if not path: break
+
+			for j in range(len(path)-1):
+				curr = path[j]
+				nextPlot = path[j+1]
+				dx = nextPlot[0] - curr[0]
+				dy = nextPlot[1] - curr[1]
+				bStop = self._apply_river_flags(curr[0], curr[1], dx, dy, riverID)
+				if bStop: return
+
+	def _apply_river_flags(self, x, y, dx, dy, rID):
+		N = CardinalDirectionTypes.CARDINALDIRECTION_NORTH
+		S = CardinalDirectionTypes.CARDINALDIRECTION_SOUTH
+		E = CardinalDirectionTypes.CARDINALDIRECTION_EAST
+		W = CardinalDirectionTypes.CARDINALDIRECTION_WEST
+		bStop = False
+
+		if dx != 0:
+			if dx == 1:
+				tx = x
+				flow = E
+				look_x = tx + 1
+			else:
+				tx = x - 1
+				flow = W
+				look_x = tx - 1
+
+			if self.nav.is_any_water(look_x, y) or self.nav.is_any_water(look_x, y-1):
+				bStop = True
+
+			p = self.map.plot(tx, y)
+			if p:
+				if not self.nav.is_any_water(tx, y):
+					if not self.nav.is_any_water(tx, y-1):
+						if self._check_merge(tx, y, False, flow):
+							bStop = True
+						p.setNOfRiver(True, flow)
+						p.setRiverID(rID)
+			if bStop: return True
+
+		if dy != 0:
+			tx = x + dx - 1
+			if dy == 1:
+				ty = y
+				flow = N
+				look_y = ty + 1
+			else:
+				ty = y - 1
+				flow = S
+				look_y = ty - 1
+
+			if self.nav.is_any_water(tx, look_y) or self.nav.is_any_water(tx+1, look_y):
+				bStop = True
+
+			p = self.map.plot(tx, ty)
+			if p:
+				if not self.nav.is_any_water(tx, ty):
+					if not self.nav.is_any_water(tx+1, ty):
+						if self._check_merge(tx, ty, True, flow):
+							bStop = True
+						p.setWOfRiver(True, flow)
+						p.setRiverID(rID)
+
+		return bStop
+
+	def _check_merge(self, x, y, is_vertical, flow):
+		N = CardinalDirectionTypes.CARDINALDIRECTION_NORTH
+		S = CardinalDirectionTypes.CARDINALDIRECTION_SOUTH
+		E = CardinalDirectionTypes.CARDINALDIRECTION_EAST
+		W = CardinalDirectionTypes.CARDINALDIRECTION_WEST
+		if is_vertical:
+			if flow == N:
+				p = self.map.plot(x, y+1)
+				if p and ((p.isWOfRiver() and p.getRiverNSDirection() == N) or (p.isNOfRiver() and p.getRiverWEDirection() == W)): return True
+				p = self.map.plot(x+1, y+1)
+				if p and (p.isNOfRiver() and p.getRiverWEDirection() == E): return True
+			else:
+				p = self.map.plot(x, y)
+				if p and (p.isNOfRiver() and p.getRiverWEDirection() == W): return True
+				p = self.map.plot(x, y-1)
+				if p and (p.isWOfRiver() and p.getRiverNSDirection() == S): return True
+				p = self.map.plot(x+1, y)
+				if p and (p.isNOfRiver() and p.getRiverWEDirection() == E): return True
+		else:
+			if flow == E:
+				p = self.map.plot(x, y)
+				if p and (p.isWOfRiver() and p.getRiverNSDirection() == N): return True
+				p = self.map.plot(x, y-1)
+				if p and (p.isWOfRiver() and p.getRiverNSDirection() == S): return True
+				p = self.map.plot(x+1, y)
+				if p and (p.isNOfRiver() and p.getRiverWEDirection() == E): return True
+			else:
+				p = self.map.plot(x-1, y)
+				if p and ((p.isNOfRiver() and p.getRiverWEDirection() == W) or (p.isWOfRiver() and p.getRiverNSDirection() == N)): return True
+				p = self.map.plot(x-1, y-1)
+				if p and (p.isWOfRiver() and p.getRiverNSDirection() == S): return True
+		return False
+
+class THem_ExtraRivers:
+	def __init__(self, map_obj, gc, dice):
+		self.map = map_obj
+		self.gc = gc
+		self.dice = dice
+		self.engine = CyEngine()
+		self.iW = map_obj.getGridWidth()
+		self.iH = map_obj.getGridHeight()
+
+	def addRiverDebugSign(self, pPlot, msg):
+		global bDebugSignsEnabled
+
+		if not bDebugSignsEnabled: return
+		if pPlot is None: return
+		if pPlot.isNone(): return
+		self.engine.addSign(pPlot, -1, msg)
+
+	def getExtraRiverEndpoint(self, startX, startY, xMin, xMax, yMin, yMax):
+		iWestDist = startX - xMin
+		iEastDist = xMax - startX
+		iSouthDist = startY - yMin
+		iNorthDist = yMax - startY
+		iBest = iWestDist
+		sSide = "W"
+
+		if iEastDist < iBest:
+			iBest = iEastDist
+			sSide = "E"
+		if iSouthDist < iBest:
+			iBest = iSouthDist
+			sSide = "S"
+		if iNorthDist < iBest:
+			iBest = iNorthDist
+			sSide = "N"
+
+		endX = startX
+		endY = startY
+		if sSide == "W":
+			endX = xMin - 2
+		elif sSide == "E":
+			endX = xMax + 2
+		elif sSide == "S":
+			endY = yMin - 2
+		else:
+			endY = yMax + 2
+
+		if endX < 0: endX = 0
+		if endX >= self.iW: endX = self.iW - 1
+		if endY < 0: endY = 0
+		if endY >= self.iH: endY = self.iH - 1
+
+		return (endX, endY)
+
+	def getExtraRiverCount(self):
+		sizekey = self.map.getWorldSize()
+		sizevalues = {
+			WorldSizeTypes.WORLDSIZE_DUEL: 1,
+			WorldSizeTypes.WORLDSIZE_TINY: 2,
+			WorldSizeTypes.WORLDSIZE_SMALL: 3,
+			WorldSizeTypes.WORLDSIZE_STANDARD: 4,
+			WorldSizeTypes.WORLDSIZE_LARGE: 5,
+			WorldSizeTypes.WORLDSIZE_HUGE: 6
+		}
+		return sizevalues.get(sizekey, 4)
+
+	def isAwayFromCoast(self, pPlot, iMinDistance):
+		startX = pPlot.getX()
+		startY = pPlot.getY()
+
+		for dx in range(-iMinDistance, iMinDistance + 1):
+			for dy in range(-iMinDistance, iMinDistance + 1):
+				x = startX + dx
+				y = startY + dy
+				if x < 0 or x >= self.iW: continue
+				if y < 0 or y >= self.iH: continue
+				if plotDistance(startX, startY, x, y) > iMinDistance: continue
+				if self.map.plot(x, y).isWater():
+					return False
+
+		return True
+
+	def removeNearbyRiverStarts(self, candidates, pStart, iMinDistance):
+		filtered = []
+		startX = pStart.getX()
+		startY = pStart.getY()
+
+		for pPlot in candidates:
+			if plotDistance(startX, startY, pPlot.getX(), pPlot.getY()) >= iMinDistance:
+				filtered.append(pPlot)
+
+		return filtered
+
+	def hasAdjacentRiver(self, pPlot):
+		startX = pPlot.getX()
+		startY = pPlot.getY()
+
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				x = startX + dx
+				y = startY + dy
+				if x < 0 or x >= self.iW: continue
+				if y < 0 or y >= self.iH: continue
+				pAdj = self.map.plot(x, y)
+				if pAdj.isNOfRiver() or pAdj.isWOfRiver():
+					return True
+
+		return False
+
+	def removeAdjacentRiverStarts(self, candidates):
+		filtered = []
+
+		for pPlot in candidates:
+			if not self.hasAdjacentRiver(pPlot):
+				filtered.append(pPlot)
+
+		return filtered
+
+	def addExtraRivers(self):
+		global bTeamPlacement
+		global teamRegionMap
+		global teamAreaMap
+		global _THEM_REGION_RECTS
+
+		if not bTeamPlacement:
+			print "THem extra rivers skipped: team placement inactive"
+			return
+
+		self.map.recalculateAreas()
+
+		if len(teamAreaMap) == 0:
+			if not _resolve_team_areas():
+				print "THem extra rivers skipped: could not resolve team areas"
+				return
+
+		nav = PathNavigator(self.map, self.dice)
+		rivers = StandardRiverMaker(nav)
+		iExtraRivers = self.getExtraRiverCount()
+		sortedTeams = teamRegionMap.keys()
+		sortedTeams.sort()
+
+		for iTeam in sortedTeams:
+			label = teamRegionMap[iTeam]
+			regionMasks = _THEM_REGION_RECTS.get(label, [])
+			if len(regionMasks) == 0:
+				print "THem extra river skipped team %d: no region masks" % iTeam
+				continue
+
+			iArea = -1
+			if teamAreaMap.has_key(iTeam):
+				iArea = teamAreaMap[iTeam]
+
+			candidates = []
+			for regionMask in regionMasks:
+				iWestX, iSouthY, iWidth, iHeight = regionMaskManager.getRegionMaskBounds(regionMask, self.iW, self.iH)
+				for x in range(iWestX, iWestX + iWidth):
+					for y in range(iSouthY, iSouthY + iHeight):
+						if x < 0 or x >= self.iW: continue
+						if y < 0 or y >= self.iH: continue
+						if not regionMaskManager.plotInRegionMask(regionMask, x, y, self.iW, self.iH): continue
+						pPlot = self.map.plot(x, y)
+						if pPlot.isNone(): continue
+						if pPlot.isWater(): continue
+						if not pPlot.isHills() and not pPlot.isPeak(): continue
+						if not self.isAwayFromCoast(pPlot, 4): continue
+						if self.hasAdjacentRiver(pPlot): continue
+						if iArea != -1:
+							if pPlot.getArea() != iArea: continue
+						candidates.append(pPlot)
+
+			if len(candidates) == 0:
+				print "THem extra river skipped team %d region %s: no valid start" % (iTeam, label)
+				continue
+
+			xMin, xMax, yMin, yMax = _get_team_region_bounds(label, self.iW, self.iH)
+			for iRiver in range(iExtraRivers):
+				if len(candidates) == 0:
+					print "THem extra river skipped team %d region %s: candidates exhausted" % (iTeam, label)
+					break
+
+				iChoice = self.dice.get(len(candidates), "THem Extra River Start")
+				pStart = candidates[iChoice]
+				candidates = self.removeNearbyRiverStarts(candidates, pStart, 3)
+				startX = pStart.getX()
+				startY = pStart.getY()
+				endX, endY = self.getExtraRiverEndpoint(startX, startY, xMin, xMax, yMin, yMax)
+
+				startRelX = float(startX) / float(self.iW)
+				startRelY = float(startY) / float(self.iH)
+				endRelX = float(endX) / float(self.iW)
+				endRelY = float(endY) / float(self.iH)
+				rivers.build([(startRelX, startRelY), (endRelX, endRelY)], meander=0.2)
+				candidates = self.removeAdjacentRiverStarts(candidates)
+				self.addRiverDebugSign(pStart, "THem river %d start T%d" % (iRiver + 1, iTeam))
+				print "THem extra river %d team %d from (%d, %d) toward (%d, %d)" % (iRiver + 1, iTeam, startX, startY, endX, endY)
+
+def THemAddExtraRivers():
+	map = CyMap()
+	gc = CyGlobalContext()
+	dice = gc.getGame().getMapRand()
+	extraRivers = THem_ExtraRivers(map, gc, dice)
+	extraRivers.addExtraRivers()
+
+def addRivers():
+	THemAddExtraRivers()
+	CyPythonMgr().allowDefaultImpl()
 
 class ResourceManager:
 	def __init__(self, map_obj, gc, dice):
@@ -1495,6 +1869,7 @@ class ResourceManager:
 										pPlot = self.map.plot(nx, ny)
 										if not pPlot.isWater() and not pPlot.isPeak() and not self._is_player_start_plot(pPlot, startLookup):
 											if pPlot.getBonusType(-1) == -1:
+												if pPlot.getFeatureType() != -1: continue
 												emergency_plots.append(pPlot)
 
 						if len(emergency_plots) > 0:
