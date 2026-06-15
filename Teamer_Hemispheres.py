@@ -1,8 +1,7 @@
 #
-#	FILE:	 Teamer_Hemispheres.py
-#	AUTHOR:  Aineias Symphalios
-#	Adapted from Ben Sarsgard's Hemispheres.py
-
+#	FILE:	Teamer_Hemispheres.py
+#	AUTHOR:	Aineias the Stymphalian
+#	Adapted from Ben Sarsgard's Hemispheres.py. Features several multiplayer-friendly customizations.
 
 from CvPythonExtensions import *
 import math
@@ -31,7 +30,7 @@ def isAdvancedMap():
 	return 0
 
 def getNumCustomMapOptions():
-	return 8
+	return 9
 	
 def getCustomMapOptionName(argsList):
 	[iOption] = argsList
@@ -50,6 +49,8 @@ def getCustomMapOptionName(argsList):
 	elif iOption == 6:
 		return "Land Food on Starts"
 	elif iOption == 7:
+		return "Reduce Coastal Peaks"
+	elif iOption == 8:
 		return "Debug Signs"
 	return ""
 	
@@ -62,7 +63,8 @@ def getNumCustomMapOptionValues(argsList):
 	elif iOption == 4: return 2
 	elif iOption == 5: return 4
 	elif iOption == 6: return 4
-	elif iOption == 7: return 2
+	elif iOption == 7: return 3
+	elif iOption == 8: return 2
 	return 0
 	
 def getCustomMapOptionDescAt(argsList):
@@ -96,6 +98,10 @@ def getCustomMapOptionDescAt(argsList):
 		return "At least 3"
 	elif iOption == 7:
 		if iSelection == 0: return "Disabled"
+		elif iSelection == 1: return "Reduce 50%"
+		return "Reduce 100%"
+	elif iOption == 8:
+		if iSelection == 0: return "Disabled"
 		return "Enabled"
 	return ""
 
@@ -109,6 +115,7 @@ def getCustomMapOptionDefault(argsList):
 	elif iOption == 5: return 2
 	elif iOption == 6: return 1
 	elif iOption == 7: return 0
+	elif iOption == 8: return 0
 	return 0
 
 def getWrapX():
@@ -147,7 +154,7 @@ def beforeGeneration():
 	teamRegionMap.clear()
 	teamAreaMap.clear()
 	bTeamPlacement = False
-	bDebugSignsEnabled = (map.getCustomMapOption(7) == 1)
+	bDebugSignsEnabled = (map.getCustomMapOption(8) == 1)
 
 	activeTeams = []
 	for iPlayer in range(gc.getMAX_CIV_PLAYERS()):
@@ -577,6 +584,51 @@ def _remove_one_tile_lakes(plotTypes, iW, iH):
 
 	return plotTypes
 
+def _is_coastal_peak_plot(plotTypes, x, y, iW, iH):
+	i = y * iW + x
+	if plotTypes[i] != PlotTypes.PLOT_PEAK:
+		return False
+
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			if dx == 0 and dy == 0: continue
+			adjX = x + dx
+			adjY = y + dy
+			if adjX < 0 or adjX >= iW: continue
+			if adjY < 0 or adjY >= iH: continue
+			if plotTypes[adjY * iW + adjX] == PlotTypes.PLOT_OCEAN:
+				return True
+
+	return False
+
+def _reduce_coastal_peaks(plotTypes, iW, iH, iReductionOption, dice):
+	if plotTypes is None:
+		return None
+	if iReductionOption <= 0:
+		return plotTypes
+
+	reducedPlots = []
+	for x in range(iW):
+		for y in range(iH):
+			if not _is_coastal_peak_plot(plotTypes, x, y, iW, iH): continue
+			bReduce = False
+			if iReductionOption == 1:
+				if dice.get(100, "THem Reduce Coastal Peak") < 50:
+					bReduce = True
+			else:
+				bReduce = True
+
+			if bReduce:
+				reducedPlots.append(y * iW + x)
+
+	for i in reducedPlots:
+		plotTypes[i] = PlotTypes.PLOT_HILLS
+
+	if len(reducedPlots) > 0:
+		print "THem reduced %d coastal peaks to hills" % len(reducedPlots)
+
+	return plotTypes
+
 def generatePlotTypes():
 	global _THEM_REGION_RECTS
 	global _START_PLOT_MAP
@@ -593,6 +645,7 @@ def generatePlotTypes():
 	continent_grain = map.getCustomMapOption(2)
 	continent_count = map.getCustomMapOption(1)
 	bPeripheralReduce = (map.getCustomMapOption(3) == 1)
+	iReduceCoastalPeaks = map.getCustomMapOption(7)
 	iContinentAngle = gc.getGame().getMapRand().get(51, "THem Continent Angle") - 25
 	print "THem continent angle:", iContinentAngle
 
@@ -648,14 +701,14 @@ def generatePlotTypes():
 			]
 	else: # 3 continents
 		regions = [
-			("PeripheralL", "Rect", 0.167, 0.450, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain, 40+iWaterPercentChange, bPeripheralReduce),
-			("PeripheralR", "Rect", 0.833, 0.550, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain, 40+iWaterPercentChange, bPeripheralReduce),
-			("PeripheralC", "Rect", 0.500, 0.500, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain, 40+iWaterPercentChange, bPeripheralReduce),
+			("PeripheralL", "Rect", 0.167, 0.450, 0.2+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain, 40+iWaterPercentChange, bPeripheralReduce),
+			("PeripheralR", "Rect", 0.833, 0.550, 0.2+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain, 40+iWaterPercentChange, bPeripheralReduce),
+			("PeripheralC", "Rect", 0.500, 0.500, 0.2+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain, 40+iWaterPercentChange, bPeripheralReduce),
 			
-			("IslandsR", "Rect", 0.833, 0.180, 0.10, 0.150, 0, "default", ScatterGrain, ScatterGrain, 85, False),
-			("IslandsL", "Rect", 0.167, 0.85, 0.10, 0.150, 0, "default", ScatterGrain, ScatterGrain, 85, False),
-			("IslandsC_Top", "Rect", 0.500, 0.900, 0.10, 0.075, 0, "default", ScatterGrain, ScatterGrain, 90, False),
-			("IslandsC_Bot", "Rect", 0.500, 0.100, 0.10, 0.075, 0, "default", ScatterGrain, ScatterGrain, 90, False),
+			("IslandsR", "Rect", 0.833, 0.22, 0.10, 0.150, 0, "default", ScatterGrain, ScatterGrain, 85, False),
+			("IslandsL", "Rect", 0.167, 0.78, 0.10, 0.150, 0, "default", ScatterGrain, ScatterGrain, 85, False),
+			("IslandsC_Top", "Rect", 0.500, 0.10, 0.10, 0.075, 0, "default", ScatterGrain, ScatterGrain, 80, False),
+			("IslandsC_Bot", "Rect", 0.500, 0.90, 0.10, 0.075, 0, "default", ScatterGrain, ScatterGrain, 80, False),
 		]
 		if continent_grain == 0:
 			additional_regions =[
@@ -670,9 +723,9 @@ def generatePlotTypes():
 				("CoreC", "Ellipse", 0.500, 0.500, 0.050, 0.23, iContinentAngle, "default", GatherGrain, ScatterGrain, 25, True),
 			]
 		region_data = [
-			("ColumnL", 0.167, 0.450, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle),
-			("ColumnR", 0.833, 0.550, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle),
-			("ColumnC", 0.500, 0.500, 0.150+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle),
+			("ColumnL", 0.167, 0.450, 0.2+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle),
+			("ColumnR", 0.833, 0.550, 0.2+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle),
+			("ColumnC", 0.500, 0.500, 0.2+fPeripheralSizeChange, 0.7+fPeripheralSizeChange, iContinentAngle),
 		]
 
 	regions.extend(additional_regions)
@@ -691,6 +744,7 @@ def generatePlotTypes():
 	for iAttempt in range(1, iMaxAttempts + 1):
 		plotgen = GeometricMultiFractal()
 		plotTypes = plotgen.generatePlotsByRegion(regions)
+		plotTypes = _reduce_coastal_peaks(plotTypes, iW, iH, iReduceCoastalPeaks, gc.getGame().getMapRand())
 		# if continent_grain < 2: # Less than Fjord
 			# plotTypes = _remove_one_tile_lakes(plotTypes, iW, iH)
 		counts = continentBalancer.countRegionLand(plotTypes, regionRects, iW, iH)
@@ -1806,9 +1860,9 @@ class ResourceManager:
 			if player.isEverAlive():
 				pStart = player.getStartingPlot()
 				if pStart and not pStart.isNone():
-					players.append((player.getID(), pStart.getX(), pStart.getY()))
+					players.append((player.getID(), pStart.getX(), pStart.getY(), pStart.getArea()))
 
-		for (pid, sx, sy) in players:
+		for (pid, sx, sy, iStartArea) in players:
 			present = {}
 
 			for dx in range(-radius, radius + 1):
@@ -1818,6 +1872,7 @@ class ResourceManager:
 					if nx >= 0 and nx < self.iW and ny >= 0 and ny < self.iH:
 						if plotDistance(sx, sy, nx, ny) <= radius:
 							pPlot = self.map.plot(nx, ny)
+							if pPlot.getArea() != iStartArea: continue
 							iBonus = pPlot.getBonusType(TeamTypes.NO_TEAM)
 							if iBonus in ids:
 								present[iBonus] = 1
@@ -1849,6 +1904,7 @@ class ResourceManager:
 							if nx >= 0 and nx < self.iW and ny >= 0 and ny < self.iH:
 								if plotDistance(sx, sy, nx, ny) <= radius:
 									pPlot = self.map.plot(nx, ny)
+									if pPlot.getArea() != iStartArea: continue
 									if self._is_player_start_plot(pPlot, startLookup) or pPlot.getBonusType(-1) != -1: continue
 									if pPlot.isWater() or pPlot.isPeak(): continue
 
@@ -1867,6 +1923,7 @@ class ResourceManager:
 								if nx >= 0 and nx < self.iW and ny >= 0 and ny < self.iH:
 									if plotDistance(sx, sy, nx, ny) <= radius:
 										pPlot = self.map.plot(nx, ny)
+										if pPlot.getArea() != iStartArea: continue
 										if not pPlot.isWater() and not pPlot.isPeak() and not self._is_player_start_plot(pPlot, startLookup):
 											if pPlot.getBonusType(-1) == -1:
 												if pPlot.getFeatureType() != -1: continue
