@@ -910,6 +910,18 @@ def _is_valid_default_start_plot(playerID, x, y):
 	startManager = THem_StartPlotManager()
 	return startManager.isValidStartPlot(map, pPlot, playerID, "default")
 
+def _is_prohibited_start_bonus(pPlot, gc):
+	ProhibitedStartBonusIDs = ['BONUS_WHEAT', 'BONUS_RICE', 'BONUS_CORN', 'BONUS_COW', 'BONUS_SHEEP', 'BONUS_PIG', 'BONUS_DEER']
+
+	iBonus = pPlot.getBonusType(-1)
+	if iBonus == -1:
+		return False
+	for bonusName in ProhibitedStartBonusIDs:
+		iProhibited = gc.getInfoTypeForString(bonusName)
+		if iProhibited != -1 and iBonus == iProhibited:
+			return True
+	return False
+
 def _assign_all_starting_plots():
 	global bTeamPlacement
 	global teamRegionMap
@@ -1015,6 +1027,7 @@ def _assign_all_starting_plots():
 							pPlot = map.plot(x, y)
 							if not startManager.isValidStartPlot(map, pPlot, playerID, "team candidate"): continue
 							if pPlot.getArea() != iTargetArea: continue
+							if _is_prohibited_start_bonus(pPlot, gc): continue
 
 							tooClose = False
 							for (ax, ay) in assigned_plots:
@@ -1046,6 +1059,7 @@ def _assign_all_starting_plots():
 						pPlot = map.plot(x, y)
 						if not startManager.isValidStartPlot(map, pPlot, playerID, "team fallback"): continue
 						if pPlot.getArea() != iTargetArea: continue
+						if _is_prohibited_start_bonus(pPlot, gc): continue
 						tooClose = False
 						for (ax, ay) in assigned_plots:
 							if plotDistance(x, y, ax, ay) < 5:
@@ -2000,7 +2014,7 @@ class ResourceManager:
 
 		print "THem map food scan: checked %d blocks, satisfied %d, placed %d, blocked %d" % (iBlocksChecked, iBlocksSatisfied, iPlaced, iBlocked)
 
-	def place_food_bonus_in_BFC(self, bonusNames, iTargetCount, bCheckExisting):
+	def place_bonus_in_BFC(self, bonusNames, iTargetCount, bCheckExisting):
 		if iTargetCount <= 0:
 			return
 
@@ -2021,6 +2035,7 @@ class ResourceManager:
 			pStart = pPlayer.getStartingPlot()
 			if pStart is None: continue
 			if pStart.isNone(): continue
+			iStartArea = pStart.getArea()
 
 			iExisting = 0
 			if bCheckExisting:
@@ -2030,6 +2045,7 @@ class ResourceManager:
 					if x < 0 or x >= self.iW: continue
 					if y < 0 or y >= self.iH: continue
 					pPlot = self.map.plot(x, y)
+					if pPlot.getArea() != iStartArea: continue
 					if pPlot.isStartingPlot(): continue
 					if pPlot.getBonusType(-1) in bonusIDs:
 						iExisting += 1
@@ -2047,6 +2063,7 @@ class ResourceManager:
 						if x < 0 or x >= self.iW: continue
 						if y < 0 or y >= self.iH: continue
 						pPlot = self.map.plot(x, y)
+						if pPlot.getArea() != iStartArea: continue
 						if pPlot.isStartingPlot(): continue
 						if pPlot.getBonusType(-1) != -1: continue
 						if pPlot.isWater() or pPlot.isPeak(): continue
@@ -2072,6 +2089,7 @@ class ResourceManager:
 						if x < 0 or x >= self.iW: continue
 						if y < 0 or y >= self.iH: continue
 						pPlot = self.map.plot(x, y)
+						if pPlot.getArea() != iStartArea: continue
 						if pPlot.isStartingPlot(): continue
 						if pPlot.getBonusType(-1) != -1: continue
 						if pPlot.isWater() or pPlot.isPeak(): continue
@@ -2378,4 +2396,4 @@ def normalizeAddExtras():
 		rm.ensure_bonus_per_grid(LandFoodBonus, iMapFoodOption+3)
 	if iStartFoodOption > 0:
 		print "PY: Teamer adding starting plot food bonuses..."
-		rm.place_food_bonus_in_BFC(StartLandFoodBonus, iStartFoodOption, True)
+		rm.place_bonus_in_BFC(StartLandFoodBonus, iStartFoodOption, True)
