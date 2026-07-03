@@ -2014,6 +2014,12 @@ class ResourceManager:
 
 		print "THem map food scan: checked %d blocks, satisfied %d, placed %d, blocked %d" % (iBlocksChecked, iBlocksSatisfied, iPlaced, iBlocked)
 
+	def _is_bfc_offset(self, dx, dy):
+		if dx == 0 and dy == 0: return False
+		if abs(dx) > 2 or abs(dy) > 2: return False
+		if abs(dx) == 2 and abs(dy) == 2: return False
+		return True
+
 	def place_bonus_in_BFC(self, bonusNames, iTargetCount, bCheckExisting):
 		if iTargetCount <= 0:
 			return
@@ -2025,8 +2031,7 @@ class ResourceManager:
 		bfcOffsets = []
 		for dx in range(-2, 3):
 			for dy in range(-2, 3):
-				if dx == 0 and dy == 0: continue
-				if abs(dx) == 2 and abs(dy) == 2: continue
+				if not self._is_bfc_offset(dx, dy): continue
 				bfcOffsets.append((dx, dy))
 
 		for iPlayer in range(self.gc.getMAX_CIV_PLAYERS()):
