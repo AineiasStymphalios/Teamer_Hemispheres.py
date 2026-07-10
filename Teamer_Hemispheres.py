@@ -1852,10 +1852,23 @@ class ResourceManager:
 		iFeature = pPlot.getFeatureType()
 		if iFeature != -1:
 			if not bonusInfo.isFeature(iFeature):
-				iFloodplains = self.gc.getInfoTypeForString("FEATURE_FLOOD_PLAINS")
-				if iFeature == iFloodplains: return False
-				if not bonusInfo.isTerrain(pPlot.getTerrainType()):
-					return False
+				return False
+
+		return True
+
+	def _is_bonus_appropriate_after_feature_clear(self, iBonus, pPlot):
+		bonusInfo = self.gc.getBonusInfo(iBonus)
+
+		if pPlot.getFeatureType() == -1:
+			return False
+
+		if pPlot.isHills():
+			if not bonusInfo.isHills(): return False
+		else:
+			if not bonusInfo.isFlatlands(): return False
+
+		if not bonusInfo.isTerrain(pPlot.getTerrainType()):
+			return False
 
 		return True
 
@@ -1929,7 +1942,7 @@ class ResourceManager:
 					if len(tier1_plots) > 0:
 						target_plot = tier1_plots[self.dice.get(len(tier1_plots), "THem Radius T1")]
 					else:
-						emergency_plots = []
+						tier2_plots = []
 						for dx in range(-radius, radius + 1):
 							for dy in range(-radius, radius + 1):
 								nx = sx + dx
@@ -1938,13 +1951,31 @@ class ResourceManager:
 									if plotDistance(sx, sy, nx, ny) <= radius:
 										pPlot = self.map.plot(nx, ny)
 										if pPlot.getArea() != iStartArea: continue
-										if not pPlot.isWater() and not pPlot.isPeak() and not self._is_player_start_plot(pPlot, startLookup):
-											if pPlot.getBonusType(-1) == -1:
-												if pPlot.getFeatureType() != -1: continue
-												emergency_plots.append(pPlot)
+										if self._is_player_start_plot(pPlot, startLookup) or pPlot.getBonusType(-1) != -1: continue
+										if pPlot.isWater() or pPlot.isPeak(): continue
+										if self._is_bonus_appropriate_after_feature_clear(chosen_id, pPlot):
+											tier2_plots.append(pPlot)
 
-						if len(emergency_plots) > 0:
-							target_plot = emergency_plots[self.dice.get(len(emergency_plots), "THem Radius Emergency")]
+						if len(tier2_plots) > 0:
+							target_plot = tier2_plots[self.dice.get(len(tier2_plots), "THem Radius T2")]
+							target_plot.setFeatureType(FeatureTypes.NO_FEATURE, -1)
+						else:
+							emergency_plots = []
+							for dx in range(-radius, radius + 1):
+								for dy in range(-radius, radius + 1):
+									nx = sx + dx
+									ny = sy + dy
+									if nx >= 0 and nx < self.iW and ny >= 0 and ny < self.iH:
+										if plotDistance(sx, sy, nx, ny) <= radius:
+											pPlot = self.map.plot(nx, ny)
+											if pPlot.getArea() != iStartArea: continue
+											if not pPlot.isWater() and not pPlot.isPeak() and not self._is_player_start_plot(pPlot, startLookup):
+												if pPlot.getBonusType(-1) == -1:
+													if pPlot.getFeatureType() != -1: continue
+													emergency_plots.append(pPlot)
+
+							if len(emergency_plots) > 0:
+								target_plot = emergency_plots[self.dice.get(len(emergency_plots), "THem Radius Emergency")]
 
 					if target_plot:
 						target_plot.setBonusType(chosen_id)
