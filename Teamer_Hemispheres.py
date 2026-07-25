@@ -1872,6 +1872,15 @@ class ResourceManager:
 
 		return True
 
+	def _clear_incompatible_feature_for_bonus(self, iBonus, pPlot):
+		iFeature = pPlot.getFeatureType()
+		if iFeature == -1:
+			return
+
+		bonusInfo = self.gc.getBonusInfo(iBonus)
+		if not bonusInfo.isFeature(iFeature):
+			pPlot.setFeatureType(FeatureTypes.NO_FEATURE, -1)
+
 	def place_bonus_in_radius(self, bonus_list, iTargetCount, iCopies, radius):
 		if iTargetCount < 1: iTargetCount = 1
 		if iCopies < 1: iCopies = 1
@@ -2170,6 +2179,7 @@ class ResourceManager:
 			relaxedPlots = self._shuffle_list(relaxedPlots, "Relaxed Region Bonus Placement")
 			for pPlot in relaxedPlots:
 				if placed >= iCopies: break
+				self._clear_incompatible_feature_for_bonus(iBonus, pPlot)
 				pPlot.setBonusType(iBonus)
 				self._debug_sign(pPlot, "THem relaxed " + bonusName + " in " + regionName + " P" + str(iPlayerCount))
 				placed += 1
@@ -2180,6 +2190,7 @@ class ResourceManager:
 			fallbackPlots = self._shuffle_list(fallbackPlots, "Last Ditch Region Bonus Placement")
 			for pPlot in fallbackPlots:
 				if placed >= iCopies: break
+				self._clear_incompatible_feature_for_bonus(iBonus, pPlot)
 				pPlot.setBonusType(iBonus)
 				self._debug_sign(pPlot, "THem fallback " + bonusName + " in " + regionName + " P" + str(iPlayerCount))
 				placed += 1
