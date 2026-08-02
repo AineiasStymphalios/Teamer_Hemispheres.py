@@ -30,7 +30,7 @@ def isAdvancedMap():
 	return 0
 
 def getNumCustomMapOptions():
-	return 9
+	return 10
 	
 def getCustomMapOptionName(argsList):
 	[iOption] = argsList
@@ -52,6 +52,8 @@ def getCustomMapOptionName(argsList):
 		return "Reduce Coastal Peaks"
 	elif iOption == 8:
 		return "Debug Signs"
+	elif iOption == 9:
+		return "Reveal Start Area Radius"
 	return ""
 	
 def getNumCustomMapOptionValues(argsList):
@@ -65,6 +67,7 @@ def getNumCustomMapOptionValues(argsList):
 	elif iOption == 6: return 4
 	elif iOption == 7: return 3
 	elif iOption == 8: return 2
+	elif iOption == 9: return 4
 	return 0
 	
 def getCustomMapOptionDescAt(argsList):
@@ -103,6 +106,11 @@ def getCustomMapOptionDescAt(argsList):
 	elif iOption == 8:
 		if iSelection == 0: return "Disabled"
 		return "Enabled"
+	elif iOption == 9:
+		if iSelection == 0: return "Disabled"
+		elif iSelection == 1: return "Radius 2"
+		elif iSelection == 2: return "Radius 3"
+		return "Radius 4"
 	return ""
 
 def getCustomMapOptionDefault(argsList):
@@ -116,6 +124,7 @@ def getCustomMapOptionDefault(argsList):
 	elif iOption == 6: return 1
 	elif iOption == 7: return 0
 	elif iOption == 8: return 0
+	elif iOption == 9: return 0
 	return 0
 
 def getWrapX():
@@ -655,7 +664,7 @@ def generatePlotTypes():
 		WorldSizeTypes.WORLDSIZE_TINY:      (3,2,1),
 		WorldSizeTypes.WORLDSIZE_SMALL:     (4,2,1),
 		WorldSizeTypes.WORLDSIZE_STANDARD:  (4,2,1),
-		WorldSizeTypes.WORLDSIZE_LARGE:     (4,2,1),
+		WorldSizeTypes.WORLDSIZE_LARGE:     (5,2,1),
 		WorldSizeTypes.WORLDSIZE_HUGE:      (5,2,1)
 	}
 	(ScatterGrain, BalanceGrain, GatherGrain) = sizevalues[sizekey]
@@ -680,8 +689,8 @@ def generatePlotTypes():
 	if continent_count == 0:
 		regions = [
 			# Required: Name, Type, Center X, Center Y, Width, Height, Angle, Terrain, Grain, Hills Grain, Water Percent, bReduceEdges
-			("PeripheralL", "Rect", 0.250, 0.45, 0.30+fPeripheralSizeChange, 0.70+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain+1, 50+iWaterPercentChange, bPeripheralReduce),
-			("PeripheralR", "Rect", 0.750, 0.55, 0.30+fPeripheralSizeChange, 0.70+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain+1, 50+iWaterPercentChange, bPeripheralReduce),
+			("PeripheralL", "Rect", 0.250, 0.45, 0.30+fPeripheralSizeChange, 0.70+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain+2, 50+iWaterPercentChange, bPeripheralReduce),
+			("PeripheralR", "Rect", 0.750, 0.55, 0.30+fPeripheralSizeChange, 0.70+fPeripheralSizeChange, iContinentAngle, "plateau", PeripheralGrain, ScatterGrain+2, 50+iWaterPercentChange, bPeripheralReduce),
 			("IslandsR", "Rect", 0.750, 0.18, 0.3, 0.2, 0, "default", ScatterGrain, ScatterGrain, 85, False),
 			("IslandsL", "Rect", 0.250, 0.82, 0.3, 0.2, 0, "default", ScatterGrain, ScatterGrain, 85, False),
 		]
@@ -1385,12 +1394,12 @@ class THem_ExtraRivers:
 	def getExtraRiverCount(self):
 		sizekey = self.map.getWorldSize()
 		sizevalues = {
-			WorldSizeTypes.WORLDSIZE_DUEL: 1,
-			WorldSizeTypes.WORLDSIZE_TINY: 2,
-			WorldSizeTypes.WORLDSIZE_SMALL: 3,
-			WorldSizeTypes.WORLDSIZE_STANDARD: 4,
-			WorldSizeTypes.WORLDSIZE_LARGE: 5,
-			WorldSizeTypes.WORLDSIZE_HUGE: 6
+			WorldSizeTypes.WORLDSIZE_DUEL: 2,
+			WorldSizeTypes.WORLDSIZE_TINY: 3,
+			WorldSizeTypes.WORLDSIZE_SMALL: 4,
+			WorldSizeTypes.WORLDSIZE_STANDARD: 5,
+			WorldSizeTypes.WORLDSIZE_LARGE: 6,
+			WorldSizeTypes.WORLDSIZE_HUGE: 7
 		}
 		return sizevalues.get(sizekey, 4)
 
@@ -2395,6 +2404,29 @@ class ResourceManager:
 					if not bestPlot.canHaveBonus(iBonus, False):
 						bestPlot.setFeatureType(FeatureTypes.NO_FEATURE, -1)
 
+def revealStartingArea(iRadius=3):
+	gc = CyGlobalContext()
+	map = CyMap()
+	iW = map.getGridWidth()
+	iH = map.getGridHeight()
+	for iPlayer in range(gc.getMAX_CIV_PLAYERS()):
+		pPlayer = gc.getPlayer(iPlayer)
+		if not pPlayer.isEverAlive(): continue
+		pStart = pPlayer.getStartingPlot()
+		if pStart is None: continue
+		if pStart.isNone(): continue
+		iTeam = pPlayer.getTeam()
+		sx = pStart.getX()
+		sy = pStart.getY()
+		for dx in range(-iRadius, iRadius + 1):
+			for dy in range(-iRadius, iRadius + 1):
+				nx = sx + dx
+				ny = sy + dy
+				if nx < 0 or nx >= iW: continue
+				if ny < 0 or ny >= iH: continue
+				if plotDistance(sx, sy, nx, ny) <= iRadius:
+					map.plot(nx, ny).setRevealed(iTeam, True, False, -1)
+
 def normalizeAddExtras():
 	gc = CyGlobalContext()
 	map = CyMap()
@@ -2405,6 +2437,8 @@ def normalizeAddExtras():
 	iTeamerBalancingOption = map.getCustomMapOption(4)
 	iMapFoodOption = map.getCustomMapOption(5)
 	iStartFoodOption = map.getCustomMapOption(6)
+	iRevealOption = map.getCustomMapOption(9)
+	iRevealRadius = 0
 	bCustomBalancing = False
 	LandFoodBonus = ["BONUS_WHEAT", "BONUS_RICE", "BONUS_CORN", "BONUS_COW", "BONUS_SHEEP", "BONUS_PIG", "BONUS_DEER", "BONUS_BANANA"]
 	StartLandFoodBonus = ["BONUS_WHEAT", "BONUS_RICE", "BONUS_CORN", "BONUS_COW", "BONUS_SHEEP", "BONUS_PIG"]
@@ -2444,3 +2478,12 @@ def normalizeAddExtras():
 	if iStartFoodOption > 0:
 		print "PY: Teamer adding starting plot food bonuses..."
 		rm.place_bonus_in_BFC(StartLandFoodBonus, iStartFoodOption, True)
+
+	if iRevealOption == 1:
+		iRevealRadius = 2
+	elif iRevealOption == 2:
+		iRevealRadius = 3
+	elif iRevealOption == 3:
+		iRevealRadius = 4
+	if iRevealRadius > 0:
+		revealStartingArea(iRevealRadius)
